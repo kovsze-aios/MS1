@@ -93,14 +93,14 @@ export default function DossierPanel({ activeTab, onClose }: DossierPanelProps) 
             className="fixed top-0 right-0 h-[100dvh] w-full md:w-[48vw] lg:w-[40vw] z-[100] bg-[#080808]/98 backdrop-blur-2xl border-l border-white/20 flex flex-col pointer-events-auto rounded-none shadow-2xl overflow-hidden"
           >
             {/* Nagłówek panelu — stały, nieprzewijalny */}
-            <div className="flex-none p-6 md:p-8 border-b border-white/10 flex justify-between items-start md:items-center gap-4 bg-[#080808]">
-              <p className="font-mono text-xs tracking-[0.3em] text-zinc-400 uppercase truncate">
+            <div className="flex-none p-6 md:p-8 border-b border-white/10 flex justify-between items-center gap-4 bg-[#080808]">
+              <p className="font-mono text-[10px] sm:text-xs tracking-[0.3em] text-zinc-400 uppercase min-w-0 flex-1 truncate">
                 {activeTab && TAB_TITLES[activeTab]}
               </p>
               <button
                 type="button"
                 onClick={onClose}
-                className="font-mono text-xs tracking-[0.2em] text-white hover:text-zinc-400 cursor-pointer transition-colors p-3 -mr-3"
+                className="font-mono text-[10px] sm:text-xs tracking-[0.2em] text-white hover:text-zinc-400 cursor-pointer transition-colors p-3 -mr-3 flex-shrink-0 whitespace-nowrap"
               >
                 ZAMKNIJ [ ✕ ]
               </button>
@@ -124,10 +124,10 @@ export default function DossierPanel({ activeTab, onClose }: DossierPanelProps) 
             <div className="p-6 md:p-8 border-t border-white/10 bg-[#080808] shrink-0">
               <a
                 href={cfg.contact.phoneHref}
-                className="w-full inline-flex items-center justify-center gap-3 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-6 py-4 font-mono text-xs tracking-[0.2em] uppercase font-bold cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 sm:gap-3 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-4 sm:px-6 py-4 font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold cursor-pointer whitespace-nowrap"
               >
-                <Phone className="w-4 h-4" />
-                <span>ZADZWOŃ: {cfg.contact.phone}</span>
+                <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="min-w-0">ZADZWOŃ: {cfg.contact.phone}</span>
               </a>
             </div>
           </motion.aside>
@@ -591,8 +591,9 @@ function RezerwacjaContent() {
         </span>
         <div className="space-y-6">
           <div>
-            <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 mb-2">
-              <Calendar className="w-3.5 h-3.5 text-zinc-400" /> Wybierz datę
+            <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 mb-2 whitespace-nowrap">
+              <Calendar className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+              <span className="min-w-0">Wybierz datę</span>
             </label>
             <input
               required
@@ -603,8 +604,9 @@ function RezerwacjaContent() {
             />
           </div>
           <div>
-            <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 mb-2">
-              <Phone className="w-3.5 h-3.5 text-zinc-400" /> Dostępne godziny
+            <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 mb-2 whitespace-nowrap">
+              <Phone className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+              <span className="min-w-0">Dostępne godziny</span>
             </label>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {cfg.bookingConfig.timeSlots.map(slot => {
@@ -668,7 +670,7 @@ function RezerwacjaContent() {
 
         {status === 'success' ? (
           <div className="py-12 text-center space-y-3">
-            <CheckCircle2 className="w-12 h-12 text-white mx-auto animate-pulse" />
+            <CheckCircle2 className="w-12 h-12 text-white mx-auto animate-pulse flex-shrink-0" />
             <h4 className="font-mono text-sm font-bold uppercase tracking-wider text-white">
               Zgłoszenie przyjęte
             </h4>
@@ -679,8 +681,9 @@ function RezerwacjaContent() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2">
-                <User className="w-3.5 h-3.5 text-zinc-400" /> Imię i Nazwisko
+              <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 whitespace-nowrap">
+                <User className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+                <span className="min-w-0">Imię i Nazwisko</span>
               </label>
               <input
                 required
@@ -693,8 +696,9 @@ function RezerwacjaContent() {
             </div>
 
             <div className="space-y-1">
-              <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2">
-                <Phone className="w-3.5 h-3.5 text-zinc-400" /> Numer telefonu
+              <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 whitespace-nowrap">
+                <Phone className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+                <span className="min-w-0">Numer telefonu</span>
               </label>
               <input
                 required
@@ -715,12 +719,12 @@ function RezerwacjaContent() {
             <button
               type="submit"
               disabled={status === 'loading'}
-              className="w-full mt-4 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-6 py-4 font-mono text-xs tracking-[0.2em] uppercase font-bold flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer"
+              className="w-full mt-4 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-4 sm:px-6 py-4 font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer whitespace-nowrap"
             >
               {status === 'loading' ? (
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
+                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin flex-shrink-0" />
               ) : (
-                'WYŚLIJ ZAPYTANIE O REJS'
+                <span className="min-w-0">WYŚLIJ ZAPYTANIE O REJS</span>
               )}
             </button>
             <p className="font-mono text-[9px] text-center text-zinc-500 tracking-[0.1em] mt-3">

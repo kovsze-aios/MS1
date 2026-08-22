@@ -390,9 +390,9 @@ export default function App() {
       <div className="fixed bottom-0 left-0 w-full z-40 bg-black/90 backdrop-blur-md border-t border-white/20 p-3 pointer-events-auto flex justify-center rounded-none md:hidden">
         <a
           href={cfg.contact.phoneHref}
-          className="w-full text-center py-3 bg-white text-black font-mono text-xs tracking-[0.2em] font-bold uppercase rounded-none"
+          className="w-full flex items-center justify-center gap-2 py-3 bg-white text-black font-mono text-[10px] sm:text-xs tracking-[0.2em] font-bold uppercase rounded-none whitespace-nowrap"
         >
-          ZADZWOŃ: {cfg.contact.phone}
+          <span className="min-w-0">ZADZWOŃ: {cfg.contact.phone}</span>
         </a>
       </div>
 
