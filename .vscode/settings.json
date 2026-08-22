@@ -1,0 +1,51 @@
+{
+  // ======================================================================
+  //  USTAWIENIA WORKSPACE - wspoldzielone przez caly zespol Aios Studio.
+  //  Plik jest commitowany do repo, dzieki czemu kazdy developer ma
+  //  identyczne formatowanie i nie generuje "smieciowych" diffow.
+  // ======================================================================
+
+  // --- Formatowanie -----------------------------------------------------
+  // Zapis pliku automatycznie formatuje kod (spojny styl w calym repo).
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  // Usuwa zbedne biale znaki na koncu linii przy zapisie.
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // --- TypeScript -------------------------------------------------------
+  // Uzywaj wersji TypeScripta z node_modules projektu, a nie tej wbudowanej
+  // w VS Code. Gwarantuje, ze IDE i terminal widza te same bledy.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  // Przy przenoszeniu plikow automatycznie aktualizuj sciezki importow.
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  // Pokazuj sciezki importow wzgledem aliasu "@/" zamiast "../../..".
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+
+  // --- Tailwind CSS -----------------------------------------------------
+  // Wlacza podpowiedzi klas Tailwinda takze wewnatrz stringow i funkcji
+  // pomocniczych cn()/clsx() uzywanych w komponentach.
+  "tailwindCSS.experimental.classRegex": [
+    ["cn\(([^)]*)\)", "'([^']*)'"],
+    ["clsx\(([^)]*)\)", "'([^']*)'"]
+  ],
+  // Dyrektywy @tailwind / @apply nie sa standardowym CSS - wyciszamy alert.
+  "css.lint.unknownAtRules": "ignore",
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+
+  // --- Wydajnosc IDE ----------------------------------------------------
+  // Nie indeksuj katalogow generowanych - wyszukiwarka dziala duzo szybciej.
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/package-lock.json": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  /* ========================================================================
+   *  tsconfig.node.json — reguły dla plików NARZĘDZIOWYCH
+   * ------------------------------------------------------------------------
+   *  Obejmuje wyłącznie pliki uruchamiane przez Node.js podczas budowania
+   *  (vite.config.ts). To jedyne miejsce, gdzie wolno korzystać z API Node'a
+   *  takich jak `node:url` czy `process.env`.
+   * ====================================================================== */
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    /* Typy Node.js — udostępniają `node:url`, `process`, `__dirname` itd.
+     * Świadomie NIE ma ich w tsconfig.app.json (kod przeglądarki). */
+    "types": ["node"],
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["vite.config.ts"]
+}

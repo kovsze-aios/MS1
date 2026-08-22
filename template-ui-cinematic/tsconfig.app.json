@@ -1,0 +1,62 @@
+{
+  /* ========================================================================
+   *  tsconfig.app.json — reguły dla KODU APLIKACJI (katalog src/)
+   * ====================================================================== */
+  "compilerOptions": {
+    /* --- Tryb projektu ---------------------------------------------------
+     * composite: wymagane, gdy plik nadrzędny odwołuje się do tego projektu
+     * przez "references". Umożliwia budowanie przyrostowe (`tsc -b`).
+     * tsBuildInfoFile: cache wyników — drugi typecheck jest wielokrotnie szybszy. */
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+    /* --- Wersja języka i biblioteki --------------------------------------
+     * target ES2022 — wspierany przez wszystkie aktualne przeglądarki.
+     * lib DOM + DOM.Iterable — typy `window`, `document`, `HTMLVideoElement` itd. */
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "useDefineForClassFields": true,
+
+    /* --- System modułów --------------------------------------------------
+     * moduleResolution "bundler" mówi TS-owi: „importy rozwiązuje bundler
+     * (Vite), więc nie wymagaj rozszerzeń .js w ścieżkach". */
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    /* isolatedModules: każdy plik musi dać się skompilować niezależnie —
+     * tego wymaga esbuild, na którym stoi Vite. */
+    "isolatedModules": true,
+    /* verbatimModuleSyntax: wymusza `import type` przy imporcie samych typów.
+     * Dzięki temu typy nie trafiają przypadkiem do finalnej paczki JS. */
+    "verbatimModuleSyntax": true,
+
+    /* --- React -----------------------------------------------------------
+     * "react-jsx" = nowa transformacja JSX (od React 17): nie trzeba
+     * importować Reacta w każdym pliku z JSX. */
+    "jsx": "react-jsx",
+
+    /* --- Emisja ----------------------------------------------------------
+     * noEmit: TypeScript wyłącznie SPRAWDZA typy. Pliki .js generuje Vite. */
+    "noEmit": true,
+
+    /* --- Rygor (im ostrzej, tym mniej bugów na produkcji) ------------------ */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    /* skipLibCheck: nie sprawdzamy typów wewnątrz node_modules —
+     * standardowa praktyka, znacząco skraca czas kompilacji. */
+    "skipLibCheck": true,
+
+    /* --- Alias ścieżek ---------------------------------------------------
+     * Musi być lustrzanym odbiciem sekcji resolve.alias z vite.config.ts. */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}

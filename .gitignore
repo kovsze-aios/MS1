@@ -1,0 +1,76 @@
+# ==========================================================================
+#  .gitignore - MASTER TEMPLATE (Aios Studio)
+# --------------------------------------------------------------------------
+#  Plik mowi Gitowi, czego NIGDY nie zapisywac w repozytorium.
+#  Zasada: do repo trafia tylko KOD ZRODLOWY. Wszystko, co da sie
+#  odtworzyc jedna komenda (npm install / npm run build) - pomijamy.
+# ==========================================================================
+
+# --- 1. ZALEZNOSCI -------------------------------------------------------
+# node_modules potrafi wazyc setki MB i jest w 100% odtwarzalne
+# z package.json + package-lock.json. Nigdy nie commitujemy.
+node_modules/
+.pnp/
+.pnp.js
+
+# --- 2. WYNIKI BUILDU ----------------------------------------------------
+# Katalogi generowane przez Vite / tsc. Odtwarzalne przez "npm run build".
+dist/
+dist-ssr/
+build/
+out/
+*.tsbuildinfo
+
+# --- 3. ZMIENNE SRODOWISKOWE (SEKRETY!) ----------------------------------
+# .env zawiera hasla, klucze API, dane dostepowe do bazy.
+# Commit takiego pliku = wyciek danych. Do repo trafia tylko .env.example.
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# --- 4. LOGI I RAPORTY ---------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- 5. CACHE NARZEDZI ---------------------------------------------------
+.cache/
+.temp/
+.vite/
+.eslintcache
+coverage/
+
+# --- 6. PLIKI SYSTEMU OPERACYJNEGO ---------------------------------------
+# Smieci tworzone automatycznie przez Windows / macOS.
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# --- 7. USTAWIENIA IDE ---------------------------------------------------
+# Ignorujemy prywatne ustawienia edytora, ALE zostawiamy wspoldzielona
+# konfiguracje zespolu (.vscode/settings.json, extensions.json).
+.idea/
+*.swp
+*.swo
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# --- 8. CIEZKIE ZASOBY MEDIALNE ------------------------------------------
+# Wideo tla (hero.mp4) trzymamy na CDN, nie w repozytorium Git.
+public/media/*.mp4
+public/media/*.mov
+# n8n - dane instancji (workflowy, poswiadczenia, baza SQLite)
+n8n_data/
+
+# Katalog na ciezkie pliki wideo tla (trzymamy poza repozytorium Git)
+public/videos/*
+!public/videos/.gitkeep
+!public/videos/README.md

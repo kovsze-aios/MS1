@@ -1,0 +1,220 @@
+/* ==========================================================================
+ *  index.css — MONOCHROME EDITORIAL BRUTALISM
+ * --------------------------------------------------------------------------
+ *  Trzy dyrektywy @tailwind poniżej to „miejsca wstrzyknięcia". PostCSS
+ *  zamienia każdą z nich na wygenerowany CSS:
+ *
+ *   @tailwind base        → reset przeglądarki (Preflight): zerowanie marginesów,
+ *                           spójne box-sizing, normalizacja typografii.
+ *   @tailwind components  → warstwa na własne klasy komponentowe.
+ *   @tailwind utilities   → tysiące klas atomowych (flex, p-4, text-white...).
+ *
+ *  KOLEJNOŚĆ = PRIORYTET (specyficzność CSS): utilities są na końcu, więc
+ *  klasa dopisana w JSX zawsze wygra z regułą z warstwy components. To celowe.
+ *
+ * --------------------------------------------------------------------------
+ *  PALETA — cała, bez wyjątków:
+ *
+ *    #050505   czerń bazowa (tło dokumentu i kart)
+ *    #ffffff   biel (tekst główny, inwersja przycisków na hover)
+ *    zinc-400  stal — etykiety techniczne, parametry
+ *    zinc-500  stal ciemniejsza — indeksy i podpisy
+ *    white/10  linia domyślna
+ *    white/15  linia wyraźniejsza (obrys kart i tabel)
+ *    white/30  linia przycisku
+ *
+ *  Zero błękitu, cyanu, gradientów kolorowych i poświat. Hierarchię buduje
+ *  KONTRAST i GRUBOŚĆ LINII, nigdy barwa.
+ *
+ *  ⚠️ Czcionki wczytuje <link> w index.html. Świadomie BEZ `@import url(...)`
+ *  tutaj — dublowałby pobranie tych samych plików, a @import w CSS blokuje
+ *  renderowanie mocniej niż <link> w <head>.
+ * ========================================================================== */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------------------------------------------------
+ *  ZMIENNE CSS
+ *  W wariancie monochromatycznym akcentem jest BIEL. Wartości nadpisuje
+ *  funkcja applyTheme() na podstawie companyConfig.theme (src/lib/theme.ts),
+ *  ale interfejs kinowy świadomie nie korzysta z klas `accent` — kolor marki
+ *  klienta obsługuje wariant klasyczny. Format „R G B" (bez przecinków) jest
+ *  wymagany przez składnię rgb(var(--accent-rgb) / <alpha-value>).
+ * ------------------------------------------------------------------------ */
+:root {
+  --accent-rgb: 255 255 255;
+  --accent-dark-rgb: 212 212 216;
+  --accent-contrast-rgb: 5 5 5;
+}
+
+/* --------------------------------------------------------------------------
+ *  WARSTWA BASE — globalne ustawienia dokumentu
+ * ------------------------------------------------------------------------ */
+@layer base {
+  html {
+    /*
+     * ⚠️ Świadomie BEZ `scroll-behavior: smooth`.
+     * Pozycja przewijania steruje klatkami wideo, więc musi być odczytywana
+     * dokładnie taka, jaka jest. Natywne wygładzanie przeglądarki nakładałoby
+     * się na interpolację z App.tsx oraz na Lenisa — trzy mechanizmy naraz
+     * dają efekt „gumy" i rozjeżdżają obraz względem scrolla.
+     */
+    -webkit-text-size-adjust: 100%;
+
+    /*
+     * PEŁNA WYSOKOŚĆ DOKUMENTU.
+     * Bez `height: 100%` element z `min-h-[100vh]` potrafi liczyć wysokość
+     * względem kontenera o zerowej wysokości — stąd luki pod wideo przy
+     * osadzeniu strony w <iframe>.
+     */
+    height: 100%;
+
+    /*
+     * TŁO NA POZIOMIE DOKUMENTU.
+     * Wideo jest `fixed`, więc nie zakrywa obszaru odsłanianego przez odbicie
+     * przy przewinięciu poza koniec strony. Bez tej linii miga tam domyślna
+     * biel przeglądarki. Kolor identyczny z tłem korzenia aplikacji — bez szwu.
+     */
+    background-color: #050505;
+
+    /*
+     * Blokada „łańcucha przewijania" i odbicia. Każde odbicie zmienia scrollY
+     * poza zakres 0–maxScroll, co przy scrubbingu objawia się szarpnięciem
+     * obrazu na krańcach strony.
+     * UWAGA: wyłącza też „pociągnij, aby odświeżyć" na Androidzie.
+     */
+    overscroll-behavior-y: none;
+
+    /* Zapobiega poziomemu przewijaniu wywołanemu przez `scale-[1.15]` na wideo. */
+    overflow-x: hidden;
+  }
+
+  body {
+    @apply font-sans text-zinc-300 antialiased;
+    background-color: #050505;
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Nagłówki zawsze wąską czcionką plakatową, wersalikami, bez świateł. */
+  h1,
+  h2,
+  h3 {
+    @apply font-display uppercase font-bold tracking-tight leading-none text-white;
+  }
+
+  /*
+   * Widoczny focus dla nawigacji klawiaturą (WCAG 2.4.7).
+   * Biały prostokąt zamiast kolorowej obwódki — `rounded-none` jest tu
+   * częścią języka wizualnego, nie przypadkiem.
+   */
+  :focus-visible {
+    @apply rounded-none outline-none ring-1 ring-white ring-offset-2;
+    --tw-ring-offset-color: #050505;
+  }
+
+  /* Pasek przewijania: cienka biała kreska na czerni (WebKit / Chromium). */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background-color: #050505;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-none bg-white/20;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/50;
+  }
+
+  /* Zaznaczenie tekstu — inwersja, spójna z hoverem przycisków. */
+  ::selection {
+    @apply bg-white text-black;
+  }
+
+  /*
+   * DOSTĘPNOŚĆ: użytkownicy z włączoną w systemie opcją „ogranicz animacje"
+   * (choroba lokomocyjna, epilepsja światłoczuła) dostają wersję bez ruchu.
+   * To nie jest opcja — to obowiązek przy stronie tak mocno animowanej.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* --------------------------------------------------------------------------
+ *  WARSTWA COMPONENTS
+ *  Klasy wielokrotnego użytku w języku brutalistycznym. Odpowiadają stałym
+ *  PANEL / CTA / MONO_LABEL z App.tsx — używaj ich w nowych sekcjach, żeby
+ *  szablon nie rozjechał się stylistycznie przy rozbudowie.
+ * ------------------------------------------------------------------------ */
+@layer components {
+  /*
+   * PANEL — podstawowa powierzchnia treści.
+   * Cztery składniki: półprzezroczysta czerń (przepuszcza wideo), rozmycie
+   * tła, cienka linia zamiast cienia, rozjaśnienie krawędzi na hover.
+   * Brutalizm rysuje KRAWĘDŹ — nie udaje głębi cieniem.
+   */
+  .panel-brutal {
+    @apply rounded-none border border-white/10 bg-black/60 backdrop-blur-md
+           transition-colors hover:border-white/40;
+  }
+
+  /* Główny przycisk CTA — obrys, wersaliki, pełna inwersja kolorów na hover. */
+  .btn-brutal {
+    @apply flex cursor-pointer items-center justify-center gap-3 rounded-none
+           border border-white/30 bg-black/50 px-8 py-4 font-mono text-xs
+           uppercase tracking-[0.25em] text-white backdrop-blur-sm
+           transition-all duration-300
+           hover:border-white hover:bg-white hover:text-black;
+  }
+
+  /* Etykieta techniczna: parametry, ceny, indeksy. Rejestr „danych". */
+  .mono-label {
+    @apply font-mono text-xs uppercase tracking-[0.25em] text-zinc-400;
+  }
+
+  /* Wielki nagłówek architektoniczny. Rejestr „głosu". */
+  .headline-brutal {
+    @apply font-display font-bold uppercase leading-none tracking-tight text-white;
+  }
+
+  /* Pozioma kreska rozdzielająca — jedyny dozwolony ornament. */
+  .rule-brutal {
+    @apply h-px w-24 bg-white/30;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ *  WARSTWA UTILITIES
+ * ------------------------------------------------------------------------ */
+@layer utilities {
+  /* Równomiernie łamie nagłówki na linie (bez samotnego słowa na końcu). */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /*
+   * WARSTWA PRZYCIEMNIAJĄCA WIDEO — czysta czerń, zero odcienia.
+   * Mocniejsza u góry i u dołu, czyli dokładnie tam, gdzie leżą belka
+   * nawigacji i przyciski. Bez niej biały tekst potrafi zniknąć na jasnych
+   * klatkach materiału.
+   */
+  .video-scrim {
+    background: linear-gradient(
+      to bottom,
+      rgba(5, 5, 5, 0.85) 0%,
+      rgba(5, 5, 5, 0.45) 30%,
+      rgba(5, 5, 5, 0.55) 70%,
+      rgba(5, 5, 5, 0.95) 100%
+    );
+  }
+}

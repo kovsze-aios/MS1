@@ -1,0 +1,101 @@
+/* ==========================================================================
+ *  index.css — GLOBALNE STYLE WARIANTU KLASYCZNEGO (jasny motyw)
+ * --------------------------------------------------------------------------
+ *  Ten sam mechanizm co w wariancie kinowym (trzy dyrektywy @tailwind
+ *  wstrzykujące kolejno: reset → komponenty → klasy atomowe), ale zestaw
+ *  klas komponentowych jest dobrany pod czytelność i szybkość, nie efekt „wow".
+ * ========================================================================== */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Wartości domyślne motywu. Nadpisuje je applyTheme() przy starcie aplikacji
+ * na podstawie companyConfig.theme — patrz src/lib/theme.ts. */
+:root {
+  --accent-rgb: 14 165 233;
+  --accent-dark-rgb: 3 105 161;
+  --accent-contrast-rgb: 255 255 255;
+}
+
+@layer base {
+  html {
+    /* Tutaj natywne płynne przewijanie jest jak najbardziej na miejscu:
+     * nie ma wideo do scrubowania, więc nic z nim nie koliduje. Kotwice
+     * (#cennik, #kontakt) przewijają się gładko bez ani jednego kB JavaScriptu. */
+    scroll-behavior: smooth;
+    /* Odsuwa cel kotwicy od górnej krawędzi, żeby przyklejony pasek
+     * nie zasłonił nagłówka sekcji po kliknięciu w menu. */
+    scroll-padding-top: 6rem;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-white font-sans text-slate-700 antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-extrabold tracking-tight text-slate-900;
+  }
+
+  /* Widoczny focus dla nawigacji klawiaturą (WCAG 2.4.7). */
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2;
+  }
+}
+
+@layer components {
+  /* Karta treści — biała powierzchnia, cienka ramka, miękki cień.
+   * W jasnym motywie to RAMKA buduje strukturę, nie przezroczystość. */
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-card;
+  }
+
+  /* Karta reagująca na kursor — dla elementów klikalnych. */
+  .card-interactive {
+    @apply card transition duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-card-hover;
+  }
+
+  /* Główne CTA. Wyraźnie większe niż typowy przycisk: na telefonie
+   * ma być trafialne kciukiem bez celowania (min. 44 px wysokości —
+   * wytyczne dostępności dotykowej). */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-accent
+           px-6 py-4 text-base font-bold text-accent-contrast
+           shadow-card transition duration-200
+           hover:bg-accent-dark hover:shadow-card-hover active:scale-[0.99];
+  }
+
+  /* Przycisk drugorzędny — obrys zamiast wypełnienia. */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border-2
+           border-slate-200 bg-white px-6 py-4 text-base font-bold text-slate-900
+           transition duration-200 hover:border-accent hover:text-accent;
+  }
+
+  /* Odznaka — ocena Google, status sezonu, plakietka „zweryfikowana". */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-slate-100
+           px-3 py-1 text-xs font-semibold text-slate-700;
+  }
+
+  /* Wspólny kontener sekcji: stała maksymalna szerokość i marginesy boczne.
+   * Jedna klasa zamiast powtarzania „mx-auto max-w-6xl px-4" w każdej sekcji. */
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Nadkreślenie sekcji. */
+  .eyebrow {
+    @apply mb-3 inline-flex items-center gap-2 text-xs font-bold uppercase
+           tracking-[0.2em] text-accent;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

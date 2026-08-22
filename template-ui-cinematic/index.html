@@ -1,0 +1,62 @@
+<!doctype html>
+<!--
+  ==========================================================================
+   index.html — JEDYNY plik HTML aplikacji (Single Page Application)
+  --------------------------------------------------------------------------
+   Vite traktuje ten plik jako "punkt wejścia": znajduje <script type="module">,
+   buduje z niego cały graf zależności aplikacji i podmienia go w produkcyjnym
+   buildzie na zoptymalizowane, zahaszowane pliki JS/CSS.
+   React nie renderuje tu nic sam z siebie — wstrzykuje się w <div id="root">.
+  ==========================================================================
+-->
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Bez tej linii strona na telefonie wyrenderuje się jak pomniejszony desktop. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Kolor paska przeglądarki na Androidzie — spójny z ciemnym motywem. -->
+    <meta name="theme-color" content="#020617" />
+
+    <!-- SEO: tytuł i opis. Podmień na dane klienta razem z companyConfig.ts. -->
+    <title>Morskie Safari | Rejsy Motorówką RIB na Foki · Mikoszewo</title>
+    <meta
+      name="description"
+      content="Wyprawy motorówką RIB do Rezerwatu Mewia Łacha. Spotkaj dzikie foki przy ujściu Wisły w Mikoszewie."
+    />
+    <meta property="og:title" content="Morskie Safari · Rejsy na Foki Mikoszewo" />
+    <meta
+      property="og:description"
+      content="Zobacz foki w naturalnym środowisku. Wyprawy motorówką RIB do ujścia Wisły."
+    />
+    <meta property="og:type" content="website" />
+
+    <!--
+      CZCIONKI GOOGLE FONTS
+      preconnect otwiera połączenie z serwerem czcionek zanim CSS o nie poprosi
+      (oszczędza ~100–300 ms na starcie). display=swap sprawia, że tekst jest
+      widoczny natychmiast w czcionce systemowej i podmienia się po pobraniu —
+      zamiast migać pustką (FOIT).
+
+      Barlow Condensed  → nagłówki (wąska, „plakatowa", kinowa)
+      Plus Jakarta Sans → treść (nowoczesny, świetnie czytelny grotesk)
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- Kontener montowania Reacta. Wszystko poniżej tworzy już src/main.tsx. -->
+    <div id="root"></div>
+
+    <!--
+      type="module" = nowoczesny standard ESM (import/export bezpośrednio
+      w przeglądarce). Dzięki temu Vite w trybie dev serwuje pliki bez
+      bundlowania, co daje niemal natychmiastowe przeładowania.
+    -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

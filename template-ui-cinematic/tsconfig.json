@@ -1,0 +1,19 @@
+{
+  /* ========================================================================
+   *  tsconfig.json — KONFIGURACJA NADRZĘDNA (tzw. solution file)
+   * ------------------------------------------------------------------------
+   *  Sam nie kompiluje żadnego pliku ("files": []). Jego jedynym zadaniem jest
+   *  wskazanie dwóch osobnych „podprojektów" TypeScripta:
+   *
+   *   1. tsconfig.app.json  → kod aplikacji z src/ (środowisko: przeglądarka),
+   *   2. tsconfig.node.json → pliki narzędziowe, np. vite.config.ts (Node.js).
+   *
+   *  PO CO ten podział? Kod przeglądarki nie powinien widzieć API Node'a
+   *  (fs, process, path) — inaczej łatwo napisać coś, co zbuduje się bez błędu,
+   *  a wysypie się w przeglądarce. Rozdzielenie projektów fizycznie temu zapobiega.
+   *
+   *  Komenda `tsc -b` (build mode) sprawdza obie referencje po kolei.
+   * ====================================================================== */
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+}

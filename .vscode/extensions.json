@@ -1,0 +1,21 @@
+{
+  // ======================================================================
+  //  REKOMENDOWANE ROZSZERZENIA
+  //  VS Code zaproponuje ich instalacje kazdemu, kto otworzy ten projekt.
+  //  Dzieki temu nowy developer jest produktywny w 2 minuty.
+  // ======================================================================
+  "recommendations": [
+    // Autouzupelnianie klas Tailwind + podglad wartosci kolorow.
+    "bradlc.vscode-tailwindcss",
+    // Jednolite formatowanie kodu (wspolpracuje z formatOnSave powyzej).
+    "esbenp.prettier-vscode",
+    // Statyczna analiza kodu - lapie bledy zanim uruchomisz aplikacje.
+    "dbaeumer.vscode-eslint",
+    // Podpowiedzi importow i sciezek plikow.
+    "christian-kohler.path-intellisense",
+    // Testowanie endpointow API (POST /api/estimate) bez wychodzenia z IDE.
+    "humao.rest-client",
+    // Podswietlanie skladni plikow .env w backendzie.
+    "mikestead.dotenv"
+  ]
+}

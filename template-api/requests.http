@@ -1,0 +1,50 @@
+### ==========================================================================
+###  requests.http - GOTOWE ZAPYTANIA TESTOWE
+### --------------------------------------------------------------------------
+###  Otworz ten plik w VS Code z rozszerzeniem "REST Client" (humao.rest-client,
+###  jest na liscie rekomendowanych w .vscode/extensions.json) i klikaj
+###  "Send Request" nad kazdym blokiem. Nie potrzebujesz Postmana.
+### ==========================================================================
+
+@host = http://localhost:4000
+
+### 1. Kontrola stanu uslugi
+GET {{host}}/api/health
+
+### 2. Cennik po stronie serwera
+GET {{host}}/api/pricing
+
+### 3. Poprawna wycena: 2 dorosłych + 1 dziecko  (oczekiwane: 190 zl brutto)
+POST {{host}}/api/estimate
+Content-Type: application/json
+
+{
+  "items": [
+    { "id": "adult", "quantity": 2 },
+    { "id": "child", "quantity": 1 }
+  ],
+  "contact": {
+    "name": "Jan Kowalski",
+    "phone": "500600700",
+    "note": "Prosze o rejs w sobote przed poludniem."
+  }
+}
+
+### 4. Blad walidacji: nieznany typ biletu (oczekiwane: HTTP 400)
+POST {{host}}/api/estimate
+Content-Type: application/json
+
+{
+  "items": [ { "id": "senior", "quantity": 1 } ]
+}
+
+### 5. Blad walidacji: zero pasazerow (oczekiwane: HTTP 400)
+POST {{host}}/api/estimate
+Content-Type: application/json
+
+{
+  "items": [ { "id": "adult", "quantity": 0 } ]
+}
+
+### 6. Nieistniejaca trasa (oczekiwane: HTTP 404)
+GET {{host}}/api/nie-ma-takiej-trasy

@@ -1,0 +1,53 @@
+{
+  /* ========================================================================
+   *  tsconfig.json — BACKEND (Node.js)
+   * ------------------------------------------------------------------------
+   *  RÓŻNICA WOBEC FRONTENDU: tutaj TypeScript FAKTYCZNIE generuje pliki .js
+   *  (brak `noEmit`). Powód jest praktyczny — produkcyjnie uruchamiamy
+   *  `node dist/server.js`, więc skompilowany JavaScript musi realnie powstać.
+   *  We frontendzie tę robotę wykonuje Vite, a TypeScript wyłącznie sprawdza typy.
+   * ====================================================================== */
+  "compilerOptions": {
+    /* --- Wersja języka --------------------------------------------------
+     * ES2022 jest w pełni wspierany przez Node.js 18+. */
+    "target": "ES2022",
+    "lib": ["ES2023"],
+
+    /* --- System modułów --------------------------------------------------
+     * "NodeNext" respektuje pole "type": "module" z package.json i stosuje
+     * reguły rozdzielczości modułów identyczne z tymi w runtime Node.js.
+     * Efekt: to, co kompiluje się bez błędu, faktycznie wystartuje. */
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    /* --- Wyjście ---------------------------------------------------------- */
+    "outDir": "./dist",
+    "rootDir": "./src",
+    /* Mapy źródeł: stos błędu w produkcji wskaże linię w .ts, a nie w .js. */
+    "sourceMap": true,
+    /* Pliki .d.ts przydadzą się, gdyby inny pakiet monorepo importował te typy. */
+    "declaration": true,
+
+    /* --- Rygor ------------------------------------------------------------ */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": true,
+    /* Wymusza jawną obsługę `undefined` przy odczycie z obiektu po kluczu
+     * (np. PRICE_LIST[id]). Dokładnie ten przypadek wystąpi przy danych
+     * przysłanych przez użytkownika — pilnowanie go jest tu na miejscu. */
+    "noUncheckedIndexedAccess": true,
+
+    /* --- Współpraca z bibliotekami --------------------------------------- */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    /* Typy globalne Node.js: process, console, Buffer. */
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

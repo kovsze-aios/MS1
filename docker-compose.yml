@@ -1,0 +1,104 @@
+# ==========================================================================
+#  docker-compose.yml — WARSTWA AUTOMATYZACJI (n8n)
+# --------------------------------------------------------------------------
+#  CO TO JEST n8n?
+#  Narzędzie do automatyzacji typu „low-code": workflow buduje się przez
+#  przeciąganie bloków, a nie pisanie kodu. W tym projekcie odbiera zapytania
+#  o rezerwację z template-api i rozsyła je dalej — e-mail do właściciela,
+#  SMS, wpis w arkuszu, karta w CRM.
+#
+#  PO CO DOCKER?
+#  n8n wymaga konkretnej wersji Node.js i zestawu zależności systemowych.
+#  Kontener zawiera je wszystkie w środku — u każdego członka zespołu,
+#  na Windows, macOS i Linuksie działa identycznie. Zero „u mnie działa".
+#
+#  URUCHOMIENIE (z katalogu _szablon-master):
+#     docker compose up -d       # start w tle
+#     docker compose logs -f     # podgląd logów na żywo
+#     docker compose down        # zatrzymanie (dane zostają na dysku)
+#
+#  Panel: http://localhost:5678
+# ==========================================================================
+
+services:
+  n8n:
+    # Konkretny obraz z Docker Hub. Świadomie BEZ tagu `latest` w produkcji —
+    # przypięcie wersji sprawia, że aktualizacja jest decyzją, a nie niespodzianką.
+    image: n8nio/n8n:latest
+
+    # Stała nazwa kontenera — wygodniejsza w komendach: docker logs aios-n8n
+    container_name: aios-n8n
+
+    # Kontener wstaje ponownie po restarcie komputera lub awarii procesu,
+    # ale NIE wtedy, gdy zatrzymasz go ręcznie (`docker compose stop`).
+    restart: unless-stopped
+
+    ports:
+      # Format: "PORT_HOSTA:PORT_KONTENERA"
+      # Lewa liczba to port na Twoim komputerze — zmień ją, jeśli 5678 jest zajęty.
+      - '5678:5678'
+
+    environment:
+      # --- Dostęp i adresacja -------------------------------------------
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      # Adres bazowy doklejany do URL-i webhooków generowanych przez n8n.
+      # Po wdrożeniu na serwer wpisz tu publiczną domenę z https://
+      - WEBHOOK_URL=http://localhost:5678/
+
+      # --- Strefa czasowa -------------------------------------------------
+      # Bez tego harmonogramy (np. „wyślij podsumowanie o 8:00") liczyłyby
+      # się według UTC, czyli latem o 10:00 czasu polskiego.
+      - GENERIC_TIMEZONE=Europe/Warsaw
+      - TZ=Europe/Warsaw
+
+      # --- Bezpieczeństwo -------------------------------------------------
+      # Wymusza szyfrowanie zapisanych poświadczeń (kluczy API, haseł SMTP).
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-zmien-ten-klucz-na-losowy-ciag}
+      # Blokuje uruchamianie węzłów wykonujących dowolny kod w kontenerze.
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
+      # Wycisza ostrzeżenie o uprawnieniach pliku konfiguracyjnego na Windowsie.
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false
+
+      # --- Diagnostyka ----------------------------------------------------
+      - N8N_LOG_LEVEL=info
+      # Wyłącza wysyłanie danych telemetrycznych na zewnątrz.
+      - N8N_DIAGNOSTICS_ENABLED=false
+
+    volumes:
+      # ⚠️ NAJWAŻNIEJSZA LINIA W TYM PLIKU.
+      # Kontenery są z założenia ulotne — usunięcie kontenera kasuje wszystko,
+      # co powstało w środku. Wolumen mapuje katalog kontenera na katalog
+      # na Twoim dysku, dzięki czemu workflowy, poświadczenia i historia
+      # wykonań PRZEŻYWAJĄ `docker compose down`.
+      #
+      # Format: "ŚCIEŻKA_NA_DYSKU:ŚCIEŻKA_W_KONTENERZE"
+      # Katalog ./n8n_data jest ignorowany przez Git (zawiera sekrety!).
+      - ./n8n_data:/home/node/.n8n
+
+    # Sprawdzanie stanu: Docker cyklicznie odpytuje endpoint zdrowia.
+    # Kontener, który wstał, ale nie odpowiada, zostanie oznaczony "unhealthy".
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:5678/healthz || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # Nie zgłaszaj awarii przez pierwszą minutę — n8n potrzebuje chwili na start.
+      start_period: 60s
+# --------------------------------------------------------------------------
+#  JAK POŁĄCZYĆ n8n Z BACKENDEM (template-api)
+#
+#   1. Uruchom n8n:            docker compose up -d
+#   2. Otwórz http://localhost:5678 i załóż konto administratora.
+#   3. Nowy workflow → węzeł startowy "Webhook" → metoda POST.
+#   4. Skopiuj wygenerowany Production URL.
+#   5. Wklej go do template-api/.env jako N8N_WEBHOOK_URL=...
+#   6. Odkomentuj blok integracji w template-api/src/server.ts
+#      (sekcja „MIEJSCE NA INTEGRACJĘ Z n8n" w endpoincie /api/estimate).
+#
+#  UWAGA SIECIOWA: gdy backend uruchamiasz lokalnie (npm run dev), a n8n
+#  w Dockerze, adres webhooka to http://localhost:5678/... — połączenie idzie
+#  przez port opublikowany wyżej. Gdyby backend też trafił do kontenera
+#  w tej samej sieci, użyłbyś nazwy usługi: http://n8n:5678/...
+# --------------------------------------------------------------------------
