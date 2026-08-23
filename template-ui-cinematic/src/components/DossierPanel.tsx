@@ -124,7 +124,7 @@ export default function DossierPanel({ activeTab, onClose }: DossierPanelProps) 
             <div className="p-6 md:p-8 border-t border-white/10 bg-[#080808] shrink-0">
               <a
                 href={cfg.contact.phoneHref}
-                className="w-full inline-flex items-center justify-center gap-2 sm:gap-3 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-4 sm:px-6 py-4 font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold cursor-pointer whitespace-nowrap"
+                className="w-full inline-flex items-center justify-center gap-2 sm:gap-3 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-4 sm:px-6 py-4 font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold cursor-pointer whitespace-nowrap flex-shrink-0"
               >
                 <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="min-w-0">ZADZWOŃ: {cfg.contact.phone}</span>
@@ -719,7 +719,7 @@ function RezerwacjaContent() {
             <button
               type="submit"
               disabled={status === 'loading'}
-              className="w-full mt-4 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-4 sm:px-6 py-4 font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer whitespace-nowrap"
+              className="w-full mt-4 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-4 sm:px-6 py-4 font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer whitespace-nowrap flex-shrink-0"
             >
               {status === 'loading' ? (
                 <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin flex-shrink-0" />

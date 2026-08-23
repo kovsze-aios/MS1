@@ -597,7 +597,7 @@ export const companyConfig: CompanyConfig = {
   },
 
   bookingConfig: {
-    webhookUrl: "https://script.google.com/macros/s/AKfycbz_TUTAJ_TWOJ_ID/exec",
+    webhookUrl: "https://script.google.com/macros/s/AKfycbwnMwqdTqZul4scDeqf3Rpy8W7Gb1dDzIAeVlOJQbaHWVaDfZTcqeGtfJlB61RDfGfqaw/exec",
     timeSlots: ["10:00", "11:30", "13:00", "14:30", "16:00", "17:30", "19:00"],
     units: [
       { id: "rib", name: "SZYBKA MOTORÓWKA RIB", capacity: 12, desc: "100 km/h · Foki · Adrenalina · 12 miejsc" },
