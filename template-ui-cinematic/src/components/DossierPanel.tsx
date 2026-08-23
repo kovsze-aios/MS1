@@ -535,29 +535,27 @@ function RezerwacjaContent() {
 
       setStatus('loading');
       try {
-        const payload = {
-          unitType: formData.unitType === 'rib' ? 'SZYBKA MOTORÓWKA RIB' : 'STATEK WOLNY',
-          date: formData.date,
-          timeSlot: formData.timeSlot,
-          seatsCount: Number(formData.seatsCount),
-          clientName: formData.clientName,
-          clientPhone: formData.clientPhone,
-          createdAt: new Date().toISOString()
-        };
+        const urlParams = new URLSearchParams();
+        urlParams.append('unitType', formData.unitType === 'rib' ? 'SZYBKA MOTORÓWKA RIB' : 'STATEK WOLNY');
+        urlParams.append('date', formData.date);
+        urlParams.append('timeSlot', formData.timeSlot);
+        urlParams.append('seatsCount', formData.seatsCount.toString());
+        urlParams.append('clientName', formData.clientName);
+        urlParams.append('clientPhone', formData.clientPhone);
+        urlParams.append('createdAt', new Date().toISOString());
 
         await fetch(cfg.bookingConfig.webhookUrl, {
           method: 'POST',
-          mode: 'no-cors', // Wymagane przez Google Apps Script
+          mode: 'no-cors',
           headers: {
-            'Content-Type': 'text/plain', // Omija restrykcje preflight przeglądarki
+            'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: JSON.stringify(payload),
+          body: urlParams.toString()
         });
         
-        // Przy no-cors odpowiedź jest ukryta (opaque). Brak błędu sieci oznacza sukces.
         setStatus('success');
       } catch (error) {
-        console.error("Błąd wysyłki:", error);
+        console.error("Fetch error:", error);
         setStatus('error');
       }
     },
