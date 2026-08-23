@@ -536,19 +536,28 @@ function RezerwacjaContent() {
       setStatus('loading');
       try {
         const payload = {
-          ...formData,
+          unitType: formData.unitType === 'rib' ? 'SZYBKA MOTORÓWKA RIB' : 'STATEK WOLNY',
+          date: formData.date,
+          timeSlot: formData.timeSlot,
+          seatsCount: Number(formData.seatsCount),
+          clientName: formData.clientName,
+          clientPhone: formData.clientPhone,
           createdAt: new Date().toISOString()
         };
 
         await fetch(cfg.bookingConfig.webhookUrl, {
           method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'no-cors', // Wymagane przez Google Apps Script
+          headers: {
+            'Content-Type': 'text/plain', // Omija restrykcje preflight przeglądarki
+          },
           body: JSON.stringify(payload),
         });
-
+        
+        // Przy no-cors odpowiedź jest ukryta (opaque). Brak błędu sieci oznacza sukces.
         setStatus('success');
-      } catch {
+      } catch (error) {
+        console.error("Błąd wysyłki:", error);
         setStatus('error');
       }
     },
