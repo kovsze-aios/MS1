@@ -1,6 +1,7 @@
 # `template-ui-cinematic` — Wariant A (High-End Video Scroll)
 
-Ciemny, „filmowy" landing, w którym **przewijanie strony steruje klatkami wideo tła**.
+Ciemny, „filmowy" landing z **pełnoekranowym wideo tła odtwarzanym w pętli** i kinowym
+reveal typografii sterowanym przewijaniem.
 
 ```bash
 npm install
@@ -10,45 +11,72 @@ npm run build    # tsc -b && vite build
 
 ---
 
-## Jak działa scroll-scrubbing
+## Wideo tła
 
-Cała mechanika mieści się w jednym efekcie w [`src/App.tsx`](src/App.tsx).
+Cała mechanika mieści się w dwóch efektach w [`src/App.tsx`](src/App.tsx).
 
-1. **Wideo jest zapauzowane** — nie ma `autoPlay` ani `loop`. Klatkę wybiera scroll.
-2. **Postęp przewijania** → `window.scrollY / (scrollHeight - innerHeight)`, przycięty do `0–1`.
-3. **Pozycja docelowa** → `target = progress × video.duration`.
-4. **Wygładzenie** w pętli `requestAnimationFrame`:
+**1. Odtwarzanie.** Wideo leci samo, w pętli, bez dźwięku:
 
-```ts
-current += (target - current) * (1 - Math.exp(-dt * 8));
-video.currentTime = current;
+```tsx
+<video autoPlay loop muted playsInline preload="auto"
+       className="absolute inset-0 w-full h-full object-cover …" />
 ```
 
-Obecność `dt` (czasu między klatkami) jest tu kluczowa: dzięki niej efekt wygląda
-identycznie na monitorze 60 Hz i 144 Hz. Popularny skrót `current += (target - current) * 0.1`
-byłby na 144 Hz ponad dwukrotnie szybszy — to najczęstszy błąd w takich implementacjach.
+Cztery atrybuty, każdy obowiązkowy z innego powodu:
 
-Jedna pętla `rAF` obsługuje **jednocześnie** Lenis (płynne przewijanie) i wideo — obie
-wartości aktualizują się w tej samej klatce, więc obraz nie „pływa" względem scrolla.
+| Atrybut | Po co |
+|---|---|
+| `autoPlay` | start bez interakcji użytkownika |
+| `muted` | **warunek konieczny** — żadna przeglądarka nie wystartuje sama materiału z dźwiękiem |
+| `playsInline` | iOS bez tego otwiera wideo na pełnym ekranie zamiast odtwarzać w miejscu |
+| `loop` | tło nie może się skończyć czarną klatką |
+
+⚠️ Zapis reactowy: `autoPlay` i `playsInline` **z wielką literą w środku**. Napisane
+małymi (`autoplay`, `playsinline`) React uzna za nieznany atrybut DOM i po cichu pominie.
+
+Dodatkowo `useEffect` woła jawnie `video.play()` na `canplay` i po powrocie do karty —
+przeglądarka potrafi odrzucić autostart, gdy karta wstaje w tle, a iOS pauzuje wideo
+po przełączeniu aplikacji. Obietnica z `play()` bywa odrzucona i **musi** mieć `catch`,
+inaczej konsola zapełnia się błędami przy każdym wejściu na stronę.
+
+Przy ustawieniu systemowym „ogranicz animacje" (`prefers-reduced-motion: reduce`)
+wideo zostaje zapauzowane i widać sam poster.
+
+**2. Przypięcie do okna.** Wideo siedzi w kontenerze `fixed inset-0 h-[100dvh]`,
+a samo ma `absolute inset-0 w-full h-full object-cover`. Rodzic sekcji ma ~400vh,
+więc `absolute` bez tego wrappera rozciągnęłoby wideo na całą wysokość dokumentu
+i `object-cover` przyciąłby kadr do wąskiego paska.
+
+> **Czego tu już nie ma: scroll-scrubbingu.** Wcześniej pozycja przewijania sterowała
+> klatkami (`video.currentTime` ustawiane w pętli rAF, `video.pause()` na `loadeddata`).
+> Skutek uboczny był taki, że atrybuty `autoPlay`/`loop` nie miały żadnego znaczenia —
+> JavaScript zatrzymywał odtwarzanie zaraz po starcie, a przy krótkiej stronie tło
+> zamarzało na pierwszej klatce. Mechanizm został usunięty, nie poprawiony.
+
+Pętla `requestAnimationFrame` **zostaje**, ale napędza wyłącznie Lenisa
+([`useSmoothScroll`](src/hooks/useSmoothScroll.ts) tworzy go z `autoRaf: false`).
+Jej usunięcie zabiłoby płynne przewijanie całej strony.
 
 ### Bramkowanie interfejsu
 
-UI pojawia się dopiero, gdy wideo zgłosi `canPlay` (stan `videoReady`), a `<AnimatePresence>`
-animuje zniknięcie ekranu ładowania. Trzy zabezpieczenia gwarantują, że strona
+UI pojawia się dopiero, gdy wideo zgłosi `canplay` (stan `videoReady`), a `<AnimatePresence>`
+animuje zniknięcie ekranu ładowania. Dwa zabezpieczenia gwarantują, że strona
 **nigdy** nie zostanie pusta:
 
-- `onCanPlay` — normalna ścieżka,
-- `onError` — brak pliku wideo (pokazujemy treść na gradiencie),
-- `UI_FALLBACK_TIMEOUT_MS` (2,5 s) — wolne łącze lub blokada autoodtwarzania.
+- `loadeddata` / `canplay` — normalna ścieżka,
+- `UI_FALLBACK_TIMEOUT_MS` (2 s) — wolne łącze, brak pliku wideo albo blokada autoodtwarzania.
 
 ---
 
 ## Materiał wideo
 
 Katalog `public/videos/` jest pusty w repozytorium (wideo nie należy do Gita).
-**Instrukcja kodowania z `ffmpeg` znajduje się w [`public/videos/README.md`](public/videos/README.md)** —
-najważniejsza jest flaga `-g 1`, która czyni każdą klatkę kluczową. Bez niej
-przeglądarka nie potrafi płynnie skakać po osi czasu i scroll wyraźnie szarpie.
+Instrukcja kodowania z `ffmpeg`: [`public/videos/README.md`](public/videos/README.md).
+
+Materiał odtwarzamy liniowo, więc **nie potrzebuje już kodowania All-Intra (`-g 1`)**,
+które obsługiwało scrubbing kosztem kilkukrotnie większego pliku. Wystarczy zwykły
+H.264 z `-movflags +faststart` (metadane na początku pliku — przeglądarka zaczyna
+odtwarzać przed pobraniem całości).
 
 ---
 
@@ -118,5 +146,7 @@ Weryfikacja po każdej zmianie w panelu: DevTools → 320 px → sprawdź, czy
 ## Dostępność
 
 Ustawienie systemowe „ogranicz animacje" (`prefers-reduced-motion`) wyłącza płynne
-przewijanie i skraca wszystkie przejścia do zera — dla części odbiorców taki ruch
-wywołuje mdłości. To wymóg, nie opcja.
+przewijanie, skraca wszystkie przejścia do zera **i pauzuje wideo tła** (zostaje
+poster) — dla części odbiorców taki ruch wywołuje mdłości. To wymóg, nie opcja.
+Media query jest obserwowane na żywo (`matchMedia(...).addEventListener('change')`),
+więc zmiana ustawienia działa bez przeładowania strony.

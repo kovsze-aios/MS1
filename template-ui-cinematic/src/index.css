@@ -80,9 +80,11 @@
     background-color: #050505;
 
     /*
-     * Blokada „łańcucha przewijania" i odbicia. Każde odbicie zmienia scrollY
-     * poza zakres 0–maxScroll, co przy scrubbingu objawia się szarpnięciem
-     * obrazu na krańcach strony.
+     * Blokada „łańcucha przewijania" i gumowego odbicia na krańcach strony.
+     * Odbicie odsłania obszar poza dokumentem, a wideo tła jest przypięte
+     * do okna (`fixed`), więc zamiast obrazu miga tam goła płaszczyzna.
+     * Przy Lenisie doliczają się do tego szarpnięcia — biblioteka i natywne
+     * odbicie walczą wtedy o tę samą wartość scrollY.
      * UWAGA: wyłącza też „pociągnij, aby odświeżyć" na Androidzie.
      */
     overscroll-behavior-y: none;

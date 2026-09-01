@@ -17,7 +17,7 @@ _szablon-master/
 │   ├── google-sheets/        FORMULY.md — SUMIFS, IFS, formatowanie warunkowe
 │   └── n8n/                  workflow-rezerwacje.json — gotowy przepływ
 ├── template-api/             ← backend: Node.js + Express + TypeScript
-├── template-ui-cinematic/    ← frontend A: dark, wideo sterowane scrollem
+├── template-ui-cinematic/    ← frontend A: dark, wideo tła w pętli
 ├── template-ui-classic/      ← frontend B: jasny, maksymalnie szybki
 ├── docker-compose.yml        ← n8n (automatyzacja) na porcie 5678
 └── .gitignore
@@ -31,7 +31,7 @@ To dwa różne **modele sprzedaży**, nie dwa zestawy kolorów:
 |---|---|---|
 | Cel | zbudować pożądanie, efekt „wow" | dać cenę i telefon w 5 sekund |
 | Motyw | ciemny, glassmorphism | jasny, wysoki kontrast |
-| Ruch | scroll steruje klatkami wideo | brak animacji |
+| Ruch | pełnoekranowe wideo tła w pętli + reveal typografii | brak animacji |
 | Zależności | + `framer-motion`, `lenis` | tylko React + Tailwind |
 | Waga JS | ~395 kB (~125 kB gzip) | ~215 kB (~68 kB gzip) |
 | Port dev | 5173 | 5174 |
@@ -83,8 +83,8 @@ cp -r _szablon-master projekt-02-nazwa-klienta
 #    projekt-02-nazwa-klienta/template-ui-classic/src/config/companyConfig.ts
 
 # 3. Materiał wideo dla wariantu kinowego
-#    → template-ui-cinematic/public/videos/hero.mp4
-#    (instrukcja kodowania: README w tym katalogu — klatki kluczowe mają znaczenie!)
+#    → template-ui-cinematic/public/videos/bg.mp4 (+ bg-poster.jpg)
+#    (instrukcja kodowania: README w tym katalogu — kluczowe jest +faststart)
 
 # 4. Instalacja i weryfikacja
 cd projekt-02-nazwa-klienta/template-ui-cinematic && npm install && npm run build
@@ -100,7 +100,7 @@ cd ../template-ui-classic && npm install && npm run build
 - [ ] `mapsEmbedUrl` wskazuje realny adres (format `?q=...&output=embed`)
 - [ ] Numer telefonu przetestowany klikalnie **na prawdziwym telefonie**
 - [ ] `npm run build` przechodzi w obu frontendach bez ostrzeżeń
-- [ ] Wideo tła zakodowane z `-g 1` (bez tego scroll szarpie)
+- [ ] Wideo tła zakodowane z `-movflags +faststart` i wgrany `bg-poster.jpg`
 
 ---
 

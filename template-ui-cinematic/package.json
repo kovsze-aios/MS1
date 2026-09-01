@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --force",
-    "optimize-video": "ffmpeg -y -i public/videos/raw.mp4 -vcodec libx264 -crf 23 -g 1 -pix_fmt yuv420p -movflags +faststart -an public/videos/bg.mp4"
+    "optimize-video": "ffmpeg -y -i public/videos/raw.mp4 -vcodec libx264 -crf 23 -preset slow -profile:v main -level 4.0 -pix_fmt yuv420p -movflags +faststart -an public/videos/bg.mp4"
   },
   "dependencies": {
     "clsx": "^2.1.1",

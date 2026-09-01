@@ -3,8 +3,22 @@
  * --------------------------------------------------------------------------
  *  ARCHITEKTURA:
  *  Fizyczny scroll (4 sekcje × 100vh) z kinowym reveal typografii (whileInView).
- *  Wideo tła: fixed, sterowane scroll-scrubbingiem w requestAnimationFrame.
+ *  Wideo tła: przypięte do okna, odtwarzane w pętli (autoPlay / loop / muted).
  *  Szczegółowe dane → wysuwany boczny Panel Dossier (zamiast centralnych modali).
+ *
+ *  ⚠️ HISTORIA JEDNEJ DECYZJI — CZEMU NIE MA TU SCROLL-SCRUBBINGU
+ *  Wcześniej pozycja scrolla sterowała klatkami wideo: pętla rAF ustawiała
+ *  `video.currentTime`, a zdarzenia `loadeddata`/`canplay` wywoływały
+ *  `video.pause()`. Efekt był taki, że atrybuty `autoPlay` i `loop` na tagu
+ *  <video> nic nie znaczyły — JavaScript zatrzymywał odtwarzanie natychmiast
+ *  po starcie, a przy krótkiej stronie (gdy `scrollHeight === innerHeight`)
+ *  tło zostawało zamrożone na klatce 0.01 i wyglądało jak martwy obraz.
+ *  Dlatego scrubbing został USUNIĘTY, a nie „poprawiony": samo dodawanie
+ *  atrybutów do JSX nigdy by tego nie naprawiło.
+ *
+ *  Pętla `requestAnimationFrame` ZOSTAJE, bo napędza Lenisa
+ *  (`useSmoothScroll` tworzy go z `autoRaf: false`). Jej usunięcie zabiłoby
+ *  płynne przewijanie całej strony.
  *
  *  PALETA: #050505 / #080808 / biały / zinc-300/400/500/600 — zero koloru.
  *  TYPOGRAFIA: Barlow Condensed (nagłówki), system mono (etykiety).
@@ -26,7 +40,6 @@ import CookieBanner from '@/components/CookieBanner';
 
 const EXPO_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
 const UI_FALLBACK_TIMEOUT_MS = 2000;
-const FALLBACK_DURATION_S = 7.0;
 
 /** Wspólna konfiguracja animacji whileInView dla sekcji treści. */
 const SECTION_REVEAL = {
@@ -48,79 +61,77 @@ export default function App() {
   const lenisRef = useSmoothScroll();
 
   /* ====================================================================
-   *  SILNIK SCROLL-SCRUBBINGU WIDEO (60 FPS)
+   *  PĘTLA requestAnimationFrame — JEDYNY NAPĘD LENISA
+   * --------------------------------------------------------------------
+   *  `useSmoothScroll` tworzy Lenisa z `autoRaf: false`, więc biblioteka
+   *  NIE ma własnej pętli animacji i bez tego wywołania płynne przewijanie
+   *  po prostu nie działa. Pętla nie dotyka już wideo — patrz nagłówek pliku.
+   * ==================================================================== */
+  useEffect(() => {
+    let animationFrameId: number;
+
+    const renderLoop = (time: number) => {
+      lenisRef.current?.raf(time);
+      animationFrameId = requestAnimationFrame(renderLoop);
+    };
+
+    animationFrameId = requestAnimationFrame(renderLoop);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [lenisRef]);
+
+  /* ====================================================================
+   *  AUTOODTWARZANIE WIDEO TŁA
+   * --------------------------------------------------------------------
+   *  Same atrybuty `autoPlay muted playsInline` wystarczają w 95% przypadków,
+   *  ale nie zawsze: przeglądarka potrafi odrzucić autostart, gdy karta
+   *  wstaje w tle, a iOS pauzuje wideo po powrocie z innej aplikacji.
+   *  Dlatego dokładamy jawne `play()` — jego obietnica bywa ODRZUCONA
+   *  (polityka autoodtwarzania) i nieobsłużony `catch` wysypywałby konsolę
+   *  przy każdym wejściu na stronę.
    * ==================================================================== */
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    // Wymuszenie załadowania bufora (iOS/Safari quirk)
-    if (videoRef.current) videoRef.current.load();
-    video.pause();
+    /*
+     * Poszanowanie ustawienia systemowego „ogranicz animacje".
+     * Dla części odbiorców ruch w tle wywołuje mdłości — zostaje wtedy
+     * sam poster (klatka statyczna). To ta sama zasada, którą stosuje
+     * useSmoothScroll; w tym projekcie traktujemy ją jako wymóg.
+     */
+    const mniejRuchu = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-    let targetTime = 0;
-    let currentTime = 0;
-    let animationFrameId: number;
-
-    let maxScroll = 0;
-    const recalcMaxScroll = () => {
-      maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-    };
-    recalcMaxScroll();
-
-    window.addEventListener('resize', recalcMaxScroll);
-    const resizeObserver = new ResizeObserver(recalcMaxScroll);
-    resizeObserver.observe(document.body);
-
-    const renderLoop = (time: number) => {
-      lenisRef.current?.raf(time);
-
-      const scrollY = window.scrollY;
-
-      if (maxScroll > 0) {
-        const progress = Math.max(0, Math.min(scrollY / maxScroll, 1));
-        const duration =
-          video.duration && !isNaN(video.duration) ? video.duration : FALLBACK_DURATION_S;
-        targetTime = progress * duration;
-      }
-
-      // Lerp wideo
-      currentTime += (targetTime - currentTime) * 0.1;
-      if (video.readyState >= 2 && Math.abs(video.currentTime - currentTime) > 0.03) {
-        video.currentTime = currentTime;
-      }
-
-      animationFrameId = requestAnimationFrame(renderLoop);
-    };
-
-    let firstFrameForced = false;
-    const handleLoaded = () => {
-      video.pause();
-      if (!firstFrameForced) {
-        video.currentTime = 0.01;
-        firstFrameForced = true;
-      }
+    const odtworz = () => {
       setVideoReady(true);
+      if (mniejRuchu.matches) {
+        video.pause();
+        return;
+      }
+      video.play().catch(() => {
+        /* Autostart zablokowany — zostaje poster. Nic nie logujemy,
+         * bo to normalne zachowanie przeglądarki, nie błąd aplikacji. */
+      });
     };
 
-    video.addEventListener('loadedmetadata', handleLoaded);
-    video.addEventListener('loadeddata', handleLoaded);
-    video.addEventListener('canplay', handleLoaded);
-    video.addEventListener('canplaythrough', handleLoaded);
+    video.addEventListener('loadeddata', odtworz);
+    video.addEventListener('canplay', odtworz);
+    // Gdy wideo jest już w buforze (np. po HMR), zdarzenia się nie powtórzą.
+    if (video.readyState >= 2) odtworz();
 
-    animationFrameId = requestAnimationFrame(renderLoop);
+    // Powrót do karty: iOS/Android potrafi wstrzymać odtwarzanie w tle.
+    const przyPowrocie = () => {
+      if (document.visibilityState === 'visible') odtworz();
+    };
+    document.addEventListener('visibilitychange', przyPowrocie);
+    mniejRuchu.addEventListener('change', odtworz);
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      video.removeEventListener('loadedmetadata', handleLoaded);
-      video.removeEventListener('loadeddata', handleLoaded);
-      video.removeEventListener('canplay', handleLoaded);
-      video.removeEventListener('canplaythrough', handleLoaded);
-      window.removeEventListener('resize', recalcMaxScroll);
-      resizeObserver.disconnect();
+      video.removeEventListener('loadeddata', odtworz);
+      video.removeEventListener('canplay', odtworz);
+      document.removeEventListener('visibilitychange', przyPowrocie);
+      mniejRuchu.removeEventListener('change', odtworz);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lenisRef]);
+  }, []);
 
   // Fallback timer — wymuś widoczność UI nawet jeśli wideo nie chce się załadować
   useEffect(() => {
@@ -153,17 +164,33 @@ export default function App() {
       {/* ================================================================
        *  WARSTWA 0 — PEŁNOEKRANOWE WIDEO TŁA
        * ================================================================ */}
-      <video
-        ref={videoRef}
-        src={cfg.media.heroVideoUrl}
-        poster={cfg.media.heroVideoPoster}
-        playsInline
-        autoPlay
-        muted
-        loop
-        preload="auto"
-        className="fixed inset-0 w-screen h-[100dvh] object-cover object-[75%_center] md:object-center scale-[1.15] pointer-events-none z-0"
-      />
+      {/*
+        Kontener przypina tło do OKNA, nie do dokumentu.
+        Rodzic tej sekcji ma ~400vh wysokości, więc samo `absolute inset-0`
+        na wideo rozciągnęłoby je na całą stronę i `object-cover` przyciąłby
+        kadr do paska. `fixed` na wrapperze + `absolute` w środku daje jedno
+        i drugie: wideo wypełnia dokładnie widoczny ekran i nie przewija się.
+      */}
+      <div className="fixed inset-0 z-0 h-[100dvh] w-screen overflow-hidden pointer-events-none">
+        <video
+          ref={videoRef}
+          src={cfg.media.heroVideoUrl}
+          poster={cfg.media.heroVideoPoster}
+          /* Komplet czterech atrybutów wymaganych przez polityki
+           * autoodtwarzania. Zapis reactowy: `autoPlay` i `playsInline`
+           * z wielką literą w środku — `autoplay`/`playsinline` małymi
+           * literami React potraktuje jako nieznany atrybut DOM i zignoruje.
+           * `muted` jest warunkiem koniecznym: przeglądarka nie wystartuje
+           * sama materiału z dźwiękiem. */
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover object-[75%_center] md:object-center scale-[1.15]"
+        />
+      </div>
 
       {/* Warstwa przyciemniająca */}
       <div
