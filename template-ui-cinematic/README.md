@@ -60,15 +60,58 @@ src/
 ├── main.tsx                   montaż Reacta, wstrzyknięcie kolorów marki
 ├── index.css                  @tailwind + klasy .glass-* (glassmorphism)
 ├── config/companyConfig.ts    ⭐ dane klienta — jedyny plik do podmiany
+├── components/
+│   ├── DossierPanel.tsx       panel wysuwany + jednosekcyjny formularz rezerwacji
+│   └── CookieBanner.tsx       zgoda na cookies analityczne
 ├── hooks/useSmoothScroll.ts   Lenis z autoRaf: false
 └── lib/
     ├── cn.ts                  clsx + tailwind-merge
-    ├── format.ts              ceny, oceny, czas (Intl, locale pl-PL)
+    ├── format.ts              ceny, oceny, czas, odmiana przez liczbę (locale pl-PL)
     ├── icons.ts               klucz z konfiguracji → komponent lucide-react
     └── theme.ts               HEX → triplet RGB → zmienna CSS
 ```
 
 **Sekcje strony:** Hero → Cennik / konfigurator biletów → Flota i foki → Lokalizacja i kontakt.
+
+---
+
+## Formularz rezerwacji (`DossierPanel.tsx`)
+
+Zakładka „REZERWACJA" to **jedna płynnie przewijana sekcja**, nie kreator krokowy:
+cztery bloki (jednostka → termin → miejsca → kontakt) oddzielone linią, wszystkie
+pola widoczne naraz, jeden przycisk wysyłki na końcu.
+
+> **Dlaczego nie kreator.** Podział na cztery ekrany z paskiem postępu wyglądał
+> porządnie, ale zabrał telefonowi to, w czym jest najlepszy: ciągłe przewijanie
+> kciukiem. Zamiast jednego ruchu palca użytkownik wykonywał cztery precyzyjne
+> kliknięcia „DALEJ", a panel podmieniał zawartość pod ręką. Do tego nie dało się
+> jednym spojrzeniem sprawdzić, co się właściwie zamawia. Reszta panelu (FLOTA,
+> CENNIK, OPINIE) też jest jednym długim zwojem — teraz REZERWACJA do niej pasuje.
+
+Walidacja odpala się przy wysyłce (nie ma czego bramkować po drodze): pokazuje
+pierwszy napotkany problem i podświetla winne pole przez `aria-invalid`.
+
+Dane lecą `POST`-em jako `x-www-form-urlencoded` w trybie `mode: 'no-cors'` pod adres
+`bookingConfig.webhookUrl`, spakowane przez `new URLSearchParams()` w sześć pól:
+`unitType`, `date`, `timeSlot`, `seatsCount`, `clientName`, `clientPhone`.
+Pełne uzasadnienie tej pary decyzji — i tego, czym za nią płacimy — stoi
+w komentarzu nad `RezerwacjaContent`. Warstwa serwerowa:
+[`../automatyzacje/README.md`](../automatyzacje/README.md).
+
+### Reguły mikroekranu (320 px)
+
+Panel na najwęższym telefonie daje ~272 px użytecznej szerokości. Trzy zasady,
+których w tym pliku **nie wolno łamać**:
+
+| Element | Klasy | Po co |
+|---|---|---|
+| przyciski, CTA, nagłówki sekcji | `flex-shrink-0 whitespace-nowrap` | nie zwężają się poniżej treści i nie łamią etykiety na dwie linie |
+| teksty zmienne w siatkach (nazwy, daty, telefony) | `min-w-0 truncate` | `truncate` **nie zadziała** bez `min-w-0` — domyślne `min-width: auto` elementu flex blokuje zwężenie |
+| długie etykiety CTA | dwa `<span>`: `sm:hidden` / `hidden sm:inline` | „WYŚLIJ ZGŁOSZENIE" na telefonie, „WYŚLIJ ZAPYTANIE O REJS" od `sm` — krótszy wariant zamiast zawijania w środku słowa |
+| długie nagłówki display | osobny `<span class="block whitespace-nowrap">` na wiersz | „ZGŁOSZENIE PRZYJĘTE" w jednej linii ma przy 36 px ~274 px i wychodzi poza 232 px dostępne na 320 px — łamiemy je ręcznie, zamiast liczyć na zawijanie |
+
+Weryfikacja po każdej zmianie w panelu: DevTools → 320 px → sprawdź, czy
+`document.documentElement.scrollWidth === clientWidth`.
 
 ---
 

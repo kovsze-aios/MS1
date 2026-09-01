@@ -12,6 +12,10 @@ _szablon-master/
 ├── .vscode/                  ← wspólna konfiguracja edytora dla zespołu
 │   ├── settings.json         formatowanie, TypeScript, Tailwind IntelliSense
 │   └── extensions.json       rekomendowane rozszerzenia
+├── automatyzacje/            ← system rezerwacji: Apps Script, formuły, n8n
+│   ├── apps-script/          Kod.gs — doPost(e) zapisujący do Google Sheets
+│   ├── google-sheets/        FORMULY.md — SUMIFS, IFS, formatowanie warunkowe
+│   └── n8n/                  workflow-rezerwacje.json — gotowy przepływ
 ├── template-api/             ← backend: Node.js + Express + TypeScript
 ├── template-ui-cinematic/    ← frontend A: dark, wideo sterowane scrollem
 ├── template-ui-classic/      ← frontend B: jasny, maksymalnie szybki
@@ -108,6 +112,41 @@ po swojej stronie** i nigdy nie ufa kwocie przysłanej przez przeglądarkę.
 `docker-compose.yml` uruchamia n8n, które może odbierać te zapytania webhookiem
 i rozsyłać dalej (e-mail, SMS, CRM). Instrukcja połączenia znajduje się w komentarzu
 na końcu pliku `docker-compose.yml`.
+
+---
+
+## System rezerwacji (architektura zero-cost)
+
+Kompletny tor od kliknięcia na stronie po wiersz w arkuszu — **bez bazy danych,
+bez serwera aplikacyjnego, bez kosztów stałych**.
+
+```
+DossierPanel.tsx  ──POST x-www-form-urlencoded──▶  Apps Script /exec  ──▶  Google Sheets
+ (jedna sekcja)           mode: no-cors              (walidacja,            ├─ Rezerwacje  (baza)
+                                                      LockService,          ├─ Grafik_Dnia (SUMIFS + IFS)
+                                                      limit miejsc)         └─ Ustawienia  (flota, próg)
+```
+
+| Warstwa | Plik |
+|---|---|
+| Formularz (jedna przewijana sekcja) | [`template-ui-cinematic/src/components/DossierPanel.tsx`](template-ui-cinematic/src/components/DossierPanel.tsx) |
+| Konfiguracja (`bookingConfig`) | [`template-ui-cinematic/src/config/companyConfig.ts`](template-ui-cinematic/src/config/companyConfig.ts) |
+| Backend zapisu | [`automatyzacje/apps-script/Kod.gs`](automatyzacje/apps-script/Kod.gs) |
+| Formuły dashboardu załogi | [`automatyzacje/google-sheets/FORMULY.md`](automatyzacje/google-sheets/FORMULY.md) |
+| Wariant z n8n | [`automatyzacje/n8n/workflow-rezerwacje.json`](automatyzacje/n8n/workflow-rezerwacje.json) |
+| Wdrożenie krok po kroku | [`automatyzacje/README.md`](automatyzacje/README.md) |
+
+Trzy decyzje projektowe, które warto znać przed dotknięciem tego kodu:
+
+1. **`mode: 'no-cors'` + `x-www-form-urlencoded`** — Apps Script nie obsługuje metody
+   `OPTIONS`, więc żądanie musi być „proste" i nie może wywołać preflightu. Cena:
+   odpowiedź jest niewidoczna dla przeglądarki, więc „sukces" w UI znaczy „żądanie
+   poszło", a nie „rezerwacja zapisana". Copy ekranu potwierdzenia mówi dokładnie to.
+2. **Kontrola przepełnienia siedzi w Apps Script**, nie we froncie — z punktu 1.
+   wynika, że front i tak nie odczytałby odmowy. Nadkomplet dostaje status
+   `LISTA_REZERWOWA` i trafia do arkusza; załoga oddzwania z inną godziną.
+3. **Nic nie kasujemy.** Odwołana rezerwacja dostaje status `ANULOWANA` i wypada
+   z sum `SUMIFS`, ale zostaje w historii.
 
 ---
 

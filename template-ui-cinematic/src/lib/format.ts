@@ -86,3 +86,42 @@ export function formatDuration(minutes: number): string {
 export function yearsSince(foundedYear: number): number {
   return Math.max(0, new Date().getFullYear() - foundedYear);
 }
+
+/**
+ * Odmiana rzeczownika przez liczbę — polska gramatyka ma TRZY formy,
+ * nie dwie jak angielska. Bez tego interfejs generuje „4 miejsc"
+ * i „1 osób", czyli dokładnie ten rodzaj usterki, który klient zauważa
+ * natychmiast, a który nie wywala żadnego testu.
+ *
+ * REGUŁA (dla liczebników głównych):
+ *   1                          → mianownik pojedynczy      „1 miejsce"
+ *   2–4, 22–24, 32–34…         → mianownik mnogi           „4 miejsca"
+ *   0, 5–21, 25–31…            → dopełniacz mnogi          „5 miejsc"
+ *
+ * Wyjątek 12–14 jest istotny: mimo końcówek 2/3/4 przyjmują formę
+ * dopełniacza („12 miejsc", nie „12 miejsca").
+ *
+ * @param liczba   wartość liczbowa
+ * @param formy    [pojedyncza, mnoga, dopełniacz], np. ['miejsce','miejsca','miejsc']
+ * @example odmien(1, ['osoba','osoby','osób'])  → "osoba"
+ * @example odmien(4, ['osoba','osoby','osób'])  → "osoby"
+ * @example odmien(12, ['osoba','osoby','osób']) → "osób"
+ */
+export function odmien(liczba: number, formy: [string, string, string]): string {
+  const n = Math.abs(Math.trunc(liczba));
+  if (n === 1) return formy[0];
+
+  const jednosci = n % 10;
+  const dziesiatki = n % 100;
+
+  if (jednosci >= 2 && jednosci <= 4 && !(dziesiatki >= 12 && dziesiatki <= 14)) {
+    return formy[1];
+  }
+  return formy[2];
+}
+
+/** Skrót dla najczęstszego przypadku w tym serwisie: „12 osób", „1 osoba". */
+export const osoby = (n: number): string => `${n} ${odmien(n, ['osoba', 'osoby', 'osób'])}`;
+
+/** To samo dla miejsc na pokładzie: „4 miejsca", „5 miejsc". */
+export const miejsca = (n: number): string => `${n} ${odmien(n, ['miejsce', 'miejsca', 'miejsc'])}`;

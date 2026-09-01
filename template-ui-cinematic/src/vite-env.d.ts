@@ -17,6 +17,16 @@
 interface ImportMetaEnv {
   /** Adres backendu, np. http://localhost:4000. Gdy pusty — UI działa w trybie demo. */
   readonly VITE_API_URL?: string;
+
+  /**
+   * Endpoint przyjmujący zgłoszenia rezerwacji: wdrożony Google Apps Script
+   * (`https://script.google.com/macros/s/<ID>/exec`) albo produkcyjny webhook
+   * n8n. Nadpisuje `companyConfig.bookingConfig.webhookUrl`, dzięki czemu
+   * podgląd (preview) i produkcja mogą pisać do dwóch różnych arkuszy.
+   *
+   * Gdy pusta — obowiązuje adres wpisany w companyConfig.ts.
+   */
+  readonly VITE_BOOKING_WEBHOOK_URL?: string;
 }
 
 interface ImportMeta {

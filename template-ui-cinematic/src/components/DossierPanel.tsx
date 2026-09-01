@@ -15,10 +15,26 @@
  *  Wszystkie dane pochodzą z companyConfig.ts — zero hardkodowanych treści.
  * ========================================================================== */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+/* `verbatimModuleSyntax: true` w tsconfig wymaga oznaczenia importów samych
+ * typów słowem `type` — dzięki temu nie trafiają do finalnej paczki JS. */
+import type { ReactNode, FormEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Phone, User, Calendar, Loader2, CheckCircle2, Star, ExternalLink } from 'lucide-react';
+import {
+  Phone,
+  User,
+  Calendar,
+  Clock,
+  Users,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  Star,
+  ExternalLink,
+} from 'lucide-react';
 import { companyConfig as cfg } from '@/config/companyConfig';
+import { cn } from '@/lib/cn';
+import { osoby, miejsca } from '@/lib/format';
 
 /* --------------------------------------------------------------------------
  *  TYPY
@@ -499,247 +515,700 @@ function OpinieContent() {
 }
 
 /* ==========================================================================
- *  ZAKŁADKA: REZERWACJA
+ *  ZAKŁADKA: REZERWACJA — JEDNA PŁYNNIE PRZEWIJANA SEKCJA
+ * --------------------------------------------------------------------------
+ *  DLACZEGO NIE KREATOR KROKOWY (świadomy rollback)
+ *  Podział na cztery ekrany z paskiem postępu wyglądał porządnie, ale zabrał
+ *  telefonowi to, w czym jest najlepszy: ciągłe przewijanie kciukiem. Każdy
+ *  krok kończył się przyciskiem „DALEJ", więc zamiast jednego ruchu palca
+ *  użytkownik wykonywał cztery precyzyjne kliknięcia w cel wielkości palca,
+ *  a panel podmieniał zawartość pod ręką. Do tego dochodził koszt ukryty:
+ *  nie dało się jednym spojrzeniem sprawdzić, co się właściwie zamawia.
+ *
+ *  Wracamy do układu, który pasuje do reszty panelu (FLOTA, CENNIK, OPINIE
+ *  też są jednym długim zwojem): wszystkie pola widoczne, cztery sekcje
+ *  oddzielone linią, jeden przycisk wysyłki na końcu. Zero stanu nawigacji,
+ *  zero paska postępu, zero animacji przejść między krokami.
+ *
+ *  ARCHITEKTURA WYSYŁKI (najważniejszy fragment tego pliku)
+ *  Google Apps Script nie obsługuje metody OPTIONS, więc nie da się przejść
+ *  przez preflight CORS. Omijamy go dwiema decyzjami, które MUSZĄ wystąpić
+ *  razem:
+ *    1. `Content-Type: application/x-www-form-urlencoded` — jedna z trzech
+ *       wartości, przy których przeglądarka klasyfikuje żądanie jako „proste"
+ *       i preflightu w ogóle nie wysyła,
+ *    2. `mode: 'no-cors'` — pas bezpieczeństwa: nawet gdyby coś w żądaniu
+ *       zdyskwalifikowało je jako proste, przeglądarka i tak je wypuści.
+ *
+ *  CENA TEGO ROZWIĄZANIA: odpowiedź jest „opaque" — status, nagłówki i treść
+ *  są dla nas niewidoczne. `await fetch(...)` kończy się sukcesem także wtedy,
+ *  gdy serwer zwrócił 500. Dlatego:
+ *    • „sukces" w tym UI znaczy „żądanie opuściło przeglądarkę", nie
+ *      „rezerwacja zapisana" — i copy ekranu potwierdzenia mówi dokładnie to,
+ *      obiecując potwierdzenie telefoniczne,
+ *    • kontrola przepełnienia rejsu jest WYŁĄCZNIE po stronie Apps Script
+ *      (patrz `automatyzacje/apps-script/Kod.gs`, status LISTA_REZERWOWA).
+ *
+ *  Jeżeli kiedyś ten kompromis przestanie wystarczać — przełącz `webhookUrl`
+ *  na n8n. Węzeł Webhook wystawia prawdziwe nagłówki CORS, więc wystarczy
+ *  usunąć `mode: 'no-cors'` i zacząć czytać `response.json()`.
+ *
+ *  MIKROEKRAN 320 px — trzy reguły, których tu nie wolno złamać:
+ *    • przyciski, CTA i nagłówki sekcji: `flex-shrink-0 whitespace-nowrap`,
+ *    • teksty zmienne w siatkach: `min-w-0 truncate` (samo `truncate` NIE
+ *      zadziała — domyślne `min-width: auto` elementu flex blokuje zwężenie),
+ *    • długie etykiety CTA: dwa `<span>` (`sm:hidden` / `hidden sm:inline`)
+ *      zamiast zawijania w środku słowa.
  * ========================================================================== */
 
+/* --------------------------------------------------------------------------
+ *  KLASY WSPÓŁDZIELONE
+ *  Wyciągnięte ze znaczników, bo powtarzają się kilka razy, a każde ich
+ *  wystąpienie musi nieść komplet zabezpieczeń mikroekranu.
+ * ------------------------------------------------------------------------ */
+
+const KL_PRZYCISK_GLOWNY =
+  'inline-flex w-full flex-shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-none border border-white bg-white px-4 py-4 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-black transition-all hover:bg-transparent hover:text-white disabled:cursor-not-allowed disabled:opacity-40 sm:text-xs';
+
+const KL_PRZYCISK_POBOCZNY =
+  'inline-flex w-full flex-shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-none border border-white/30 bg-transparent px-4 py-4 font-mono text-[10px] uppercase tracking-[0.2em] text-white transition-colors hover:border-white disabled:opacity-30 sm:text-xs';
+
+const KL_POLE =
+  'w-full appearance-none rounded-none border border-white/20 bg-transparent px-4 py-3 font-mono text-sm text-white transition-colors placeholder:text-zinc-600 focus:border-white focus:outline-none focus:ring-0';
+
+const KL_ETYKIETA =
+  'mb-2 flex items-center gap-2 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400';
+
+const KL_LICZNIK =
+  'flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center rounded-none border border-white/25 font-mono text-xl leading-none text-white transition-colors hover:border-white disabled:cursor-not-allowed disabled:opacity-25';
+
+/* --------------------------------------------------------------------------
+ *  NARZĘDZIA
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Data w formacie `RRRR-MM-DD` w strefie LOKALNEJ użytkownika.
+ *
+ * ⚠️ Świadomie bez `toISOString().slice(0,10)` — ta metoda zwraca czas UTC,
+ * więc dla kogoś w Polsce między 00:00 a 02:00 (czas letni) podałaby datę
+ * WCZORAJSZĄ. Skutek: pole daty pozwoliłoby wybrać termin, który backend
+ * odrzuci jako przeszły, a przy `no-cors` użytkownik nie zobaczyłby błędu.
+ */
+function dataISO(przesuniecieDni = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + przesuniecieDni);
+  const rok = d.getFullYear();
+  const miesiac = String(d.getMonth() + 1).padStart(2, '0');
+  const dzien = String(d.getDate()).padStart(2, '0');
+  return `${rok}-${miesiac}-${dzien}`;
+}
+
+/**
+ * Czy dany slot już „przepadł". Sprawdzamy tylko dla dzisiejszej daty —
+ * dla dat przyszłych wszystkie godziny są dostępne.
+ *
+ * Bufor 60 minut: nie ma sensu przyjmować zgłoszenia na rejs, który wypływa
+ * za kwadrans. Klient i tak nie zdąży dojechać na przystań, a załoga dostanie
+ * telefon, którego nie da się obsłużyć.
+ */
+function slotMinal(data: string, godzina: string): boolean {
+  if (!data || data !== dataISO()) return false;
+  const [g, m] = godzina.split(':').map(Number);
+  const teraz = new Date();
+  return g * 60 + m <= teraz.getHours() * 60 + teraz.getMinutes() + 60;
+}
+
+/** Same cyfry — telefon wpisuje się ze spacjami, myślnikami albo z `+48`. */
+const sameCyfry = (v: string): string => v.replace(/\D/g, '');
+
+/* --------------------------------------------------------------------------
+ *  KOMPONENT GŁÓWNY
+ * ------------------------------------------------------------------------ */
+
 function RezerwacjaContent() {
-  const [formData, setFormData] = useState({
-    unitType: cfg.bookingConfig.units[0]?.id || 'rib',
+  const rez = cfg.bookingConfig;
+
+  const [status, setStatus] = useState<'idle' | 'wysylka' | 'sukces' | 'blad'>('idle');
+  /* Komunikaty walidacji pokazujemy dopiero po pierwszej próbie wysyłki —
+   * krzyczenie „uzupełnij pole" na puste pole, którego nikt jeszcze nie
+   * dotknął, jest po prostu niegrzeczne. */
+  const [proba, setProba] = useState(false);
+
+  const [form, setForm] = useState({
+    unitId: rez.units[0]?.id ?? '',
     date: '',
     timeSlot: '',
-    seatsCount: 2,
-    clientName: '',
-    clientPhone: '',
+    seats: rez.defaultSeats,
+    name: '',
+    phone: '',
   });
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-  const updateForm = (key: keyof typeof formData, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
-  };
+  const jednostka = useMemo(
+    () => rez.units.find((u) => u.id === form.unitId) ?? rez.units[0],
+    [rez.units, form.unitId],
+  );
 
-  const handleSeatsChange = (delta: number) => {
-    setFormData((prev) => {
-      const newSeats = Math.max(1, Math.min(cfg.bookingConfig.maxCapacity, prev.seatsCount + delta));
-      return { ...prev, seatsCount: newSeats };
-    });
-  };
+  /* Limit bierzemy z WYBRANEJ jednostki, nie z globalnego maxCapacity —
+   * inaczej mniejsza łódź przyjęłaby rezerwację na 12 osób. */
+  const limitMiejsc = Math.min(jednostka?.capacity ?? rez.maxCapacity, rez.maxCapacity);
 
+  /**
+   * Walidacja całego formularza naraz — bez kroków nie ma czego bramkować
+   * po drodze, więc sprawdzamy wszystko w momencie wysyłki i pokazujemy
+   * pierwszy napotkany problem razem z podświetleniem winnego pola.
+   *
+   * Zwraca `null`, gdy komplet jest poprawny.
+   */
+  const bledy = useMemo(() => {
+    const lista: { pole: 'date' | 'timeSlot' | 'seats' | 'name' | 'phone'; tekst: string }[] = [];
+
+    if (!form.date) {
+      lista.push({ pole: 'date', tekst: 'Wybierz datę rejsu.' });
+    } else if (form.date < dataISO()) {
+      /* Porównanie STRINGÓW jest tu poprawne i celowe: format RRRR-MM-DD
+       * układa się chronologicznie także alfabetycznie, więc nie trzeba
+       * parsować dat ani martwić się o strefy czasowe. */
+      lista.push({ pole: 'date', tekst: 'Ta data już minęła.' });
+    } else if (form.date > dataISO(rez.bookingHorizonDays)) {
+      lista.push({ pole: 'date', tekst: `Rezerwujemy najdalej ${rez.bookingHorizonDays} dni w przód.` });
+    }
+
+    if (!form.timeSlot) {
+      lista.push({ pole: 'timeSlot', tekst: 'Wybierz godzinę wypłynięcia.' });
+    } else if (slotMinal(form.date, form.timeSlot)) {
+      lista.push({ pole: 'timeSlot', tekst: 'Ta godzina już minęła.' });
+    }
+
+    if (form.seats < 1 || form.seats > limitMiejsc) {
+      lista.push({ pole: 'seats', tekst: `Ta jednostka zabiera maksymalnie ${osoby(limitMiejsc)}.` });
+    }
+
+    if (form.name.trim().length < 3) {
+      lista.push({ pole: 'name', tekst: 'Podaj imię i nazwisko (min. 3 znaki).' });
+    }
+
+    if (sameCyfry(form.phone).length < 9) {
+      lista.push({ pole: 'phone', tekst: 'Numer telefonu: minimum 9 cyfr.' });
+    }
+
+    return lista;
+  }, [form, limitMiejsc, rez.bookingHorizonDays]);
+
+  /** Czy dane pole ma błąd — steruje obramowaniem i atrybutem aria-invalid. */
+  const zleUzupelnione = (pole: string): boolean => proba && bledy.some((b) => b.pole === pole);
+
+  const zmienMiejsca = useCallback(
+    (delta: number) => {
+      setForm((p) => ({ ...p, seats: Math.max(1, Math.min(limitMiejsc, p.seats + delta)) }));
+    },
+    [limitMiejsc],
+  );
+
+  /* ------------------------------------------------------------------------
+   *  WYSYŁKA — patrz nagłówek pliku po pełne uzasadnienie trybu no-cors
+   * ---------------------------------------------------------------------- */
   const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    async (e: FormEvent) => {
       e.preventDefault();
-      
-      if (!formData.date || !formData.timeSlot || !formData.clientName || !formData.clientPhone) {
-        alert("Wypełnij wszystkie pola (w tym godzinę rejsu) przed wysłaniem zapytania.");
+      if (status === 'wysylka') return;
+
+      if (bledy.length > 0) {
+        setProba(true);
         return;
       }
 
-      setStatus('loading');
-      try {
-        const urlParams = new URLSearchParams();
-        urlParams.append('unitType', formData.unitType === 'rib' ? 'SZYBKA MOTORÓWKA RIB' : 'STATEK WOLNY');
-        urlParams.append('date', formData.date);
-        urlParams.append('timeSlot', formData.timeSlot);
-        urlParams.append('seatsCount', formData.seatsCount.toString());
-        urlParams.append('clientName', formData.clientName);
-        urlParams.append('clientPhone', formData.clientPhone);
-        urlParams.append('createdAt', new Date().toISOString());
+      setStatus('wysylka');
 
-        await fetch(cfg.bookingConfig.webhookUrl, {
+      /*
+       * URLSearchParams robi trzy rzeczy naraz:
+       *  • koduje procentowo znaki spoza ASCII (polskie znaki w nazwisku),
+       *  • escapuje `&` i `=` w wartościach, więc nie da się rozbić payloadu,
+       *  • `toString()` daje dokładnie format oczekiwany przez `e.parameter`
+       *    w Apps Script. Ręczne sklejanie stringa potrafiłoby wysłać
+       *    „Anna & Piotr" jako dwa osobne parametry.
+       */
+      const payload = new URLSearchParams();
+      payload.set('unitType', jednostka?.name ?? '');
+      payload.set('date', form.date);
+      payload.set('timeSlot', form.timeSlot);
+      payload.set('seatsCount', String(form.seats));
+      payload.set('clientName', form.name.trim());
+      payload.set('clientPhone', sameCyfry(form.phone));
+
+      /* Bez limitu czasu zawieszone żądanie zostawia spinner na zawsze.
+       * 15 s to z zapasem więcej niż zimny start Apps Script (~2–4 s). */
+      const kontroler = new AbortController();
+      const licznik = window.setTimeout(() => kontroler.abort(), 15000);
+
+      try {
+        await fetch(rez.webhookUrl, {
           method: 'POST',
           mode: 'no-cors',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: urlParams.toString()
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: payload.toString(),
+          signal: kontroler.signal,
         });
-        
-        setStatus('success');
-      } catch (error) {
-        console.error("Fetch error:", error);
-        setStatus('error');
+        setStatus('sukces');
+      } catch (err) {
+        /* Tu trafiamy TYLKO przy awarii sieci albo przekroczeniu limitu czasu.
+         * Błąd 500 po stronie serwera przejdzie jako „sukces" — to wpisana
+         * w tryb no-cors ślepota, którą rekompensuje telefoniczne
+         * potwierdzenie rezerwacji. */
+        console.error('Wysyłka rezerwacji nieudana:', err);
+        setStatus('blad');
+      } finally {
+        window.clearTimeout(licznik);
       }
     },
-    [formData],
+    [bledy, form, jednostka, rez.webhookUrl, status],
   );
 
+  const resetuj = useCallback(() => {
+    setStatus('idle');
+    setProba(false);
+    setForm({
+      unitId: rez.units[0]?.id ?? '',
+      date: '',
+      timeSlot: '',
+      seats: rez.defaultSeats,
+      name: '',
+      phone: '',
+    });
+  }, [rez.units, rez.defaultSeats]);
+
+  /* --- EKRAN POTWIERDZENIA (zastępuje cały formularz) --- */
+  if (status === 'sukces') {
+    return (
+      <EkranPotwierdzenia
+        jednostka={jednostka?.name ?? ''}
+        termin={`${form.date} · ${form.timeSlot}`}
+        miejsca={form.seats}
+        telefon={form.phone}
+        onNowa={resetuj}
+      />
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* KROK 1: WYBÓR JEDNOSTKI */}
-      <div className="border border-white/15 bg-black/70 p-6 sm:p-8">
-        <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-400 block mb-4">
-          KROK 1 // WYBÓR JEDNOSTKI
-        </span>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {cfg.bookingConfig.units.map(unit => {
-            const isActive = formData.unitType === unit.id;
+    <form onSubmit={handleSubmit} noValidate className="space-y-10">
+      <p className="text-xs leading-relaxed text-zinc-400">
+        Rezerwacja w jednym przewinięciu: wybierz jednostkę, termin i liczbę miejsc,
+        zostaw numer — oddzwaniamy z potwierdzeniem. Bez przedpłat.
+      </p>
+
+      {/* ── 01 · JEDNOSTKA ─────────────────────────────────────────────── */}
+      <Sekcja indeks="01" tytul="JEDNOSTKA">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {rez.units.map((u) => {
+            const aktywny = u.id === form.unitId;
             return (
               <button
-                key={unit.id}
+                key={u.id}
                 type="button"
-                onClick={() => updateForm('unitType', unit.id)}
-                className={`p-4 text-left border rounded-none transition-colors ${
-                  isActive 
-                    ? 'bg-white text-black font-bold border-white' 
-                    : 'bg-transparent text-white border-white/20 hover:border-white/50 cursor-pointer'
-                }`}
+                aria-pressed={aktywny}
+                onClick={() =>
+                  setForm((p) => ({
+                    ...p,
+                    unitId: u.id,
+                    // Zmiana jednostki może obniżyć limit — przycinamy licznik,
+                    // żeby nie zostać z 12 miejscami na 8-osobowej łodzi.
+                    seats: Math.min(p.seats, u.capacity),
+                  }))
+                }
+                className={cn(
+                  'min-w-0 cursor-pointer rounded-none border p-4 text-left transition-colors',
+                  aktywny
+                    ? 'border-white bg-white text-black'
+                    : 'border-white/20 bg-transparent text-white hover:border-white/60',
+                )}
               >
-                <div className="font-mono text-sm uppercase tracking-wider mb-2">{unit.name}</div>
-                <div className={`text-xs ${isActive ? 'text-zinc-700' : 'text-zinc-400'}`}>{unit.desc}</div>
+                <span className="block truncate font-mono text-[11px] font-bold uppercase tracking-[0.15em] sm:text-sm">
+                  {u.name}
+                </span>
+                <span
+                  className={cn(
+                    'mt-2 block truncate text-[11px]',
+                    aktywny ? 'text-zinc-700' : 'text-zinc-400',
+                  )}
+                  title={u.desc}
+                >
+                  {u.desc}
+                </span>
+                <span
+                  className={cn(
+                    'mt-3 block whitespace-nowrap font-mono text-[10px] tracking-[0.2em]',
+                    aktywny ? 'text-zinc-600' : 'text-zinc-500',
+                  )}
+                >
+                  MAX {osoby(u.capacity).toUpperCase()}
+                </span>
               </button>
-            )
+            );
           })}
         </div>
-      </div>
+      </Sekcja>
 
-      {/* KROK 2: DATA I GODZINA */}
-      <div className="border border-white/15 bg-black/70 p-6 sm:p-8">
-        <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-400 block mb-4">
-          KROK 2 // DATA I GODZINA REJSU
-        </span>
+      {/* ── 02 · TERMIN ────────────────────────────────────────────────── */}
+      <Sekcja indeks="02" tytul="TERMIN REJSU">
         <div className="space-y-6">
           <div>
-            <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 mb-2 whitespace-nowrap">
-              <Calendar className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
-              <span className="min-w-0">Wybierz datę</span>
+            <label htmlFor="rez-data" className={KL_ETYKIETA}>
+              <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="min-w-0 truncate">Data</span>
             </label>
             <input
-              required
+              id="rez-data"
               type="date"
-              value={formData.date}
-              onChange={(e) => updateForm('date', e.target.value)}
-              className="w-full rounded-none border border-white/20 bg-transparent p-3 text-white font-mono text-xs [color-scheme:dark] appearance-none focus:border-white focus:ring-0 focus:outline-none transition-colors cursor-pointer"
+              value={form.date}
+              /* `min`/`max` wygaszają w natywnym kalendarzu terminy, których
+                 backend i tak by nie przyjął — użytkownik nie zdąży się pomylić. */
+              min={dataISO()}
+              max={dataISO(rez.bookingHorizonDays)}
+              aria-invalid={zleUzupelnione('date')}
+              onChange={(e) => setForm((p) => ({ ...p, date: e.target.value, timeSlot: '' }))}
+              className={cn(
+                KL_POLE,
+                'cursor-pointer [color-scheme:dark]',
+                zleUzupelnione('date') && 'border-white',
+              )}
             />
           </div>
+
           <div>
-            <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 mb-2 whitespace-nowrap">
-              <Phone className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
-              <span className="min-w-0">Dostępne godziny</span>
+            <label className={KL_ETYKIETA}>
+              <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="min-w-0 truncate">Godzina wypłynięcia</span>
             </label>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {cfg.bookingConfig.timeSlots.map(slot => {
-                const isActive = formData.timeSlot === slot;
+
+            {/* Siatka flex: `flex-wrap` zawija wiersz, `flex-shrink-0` na
+                kafelkach pilnuje, żeby godzina nigdy się nie ścisnęła. */}
+            <div className="flex flex-wrap gap-2">
+              {rez.timeSlots.map((slot) => {
+                const zablokowany = !form.date || slotMinal(form.date, slot);
+                const aktywny = form.timeSlot === slot;
                 return (
                   <button
                     key={slot}
                     type="button"
-                    onClick={() => updateForm('timeSlot', slot)}
-                    className={`py-2 px-1 font-mono text-xs text-center border rounded-none transition-colors ${
-                      isActive 
-                        ? 'bg-white text-black font-bold border-white' 
-                        : 'bg-transparent text-white border-white/20 hover:border-white/50 cursor-pointer'
-                    }`}
+                    disabled={zablokowany}
+                    aria-pressed={aktywny}
+                    onClick={() => setForm((p) => ({ ...p, timeSlot: slot }))}
+                    className={cn(
+                      'flex-shrink-0 whitespace-nowrap rounded-none border px-3 py-2 font-mono text-xs tabular-nums transition-colors',
+                      aktywny
+                        ? 'border-white bg-white font-bold text-black'
+                        : 'cursor-pointer border-white/20 text-white hover:border-white/60',
+                      zablokowany &&
+                        'cursor-not-allowed border-white/10 text-zinc-600 line-through hover:border-white/10',
+                    )}
                   >
                     {slot}
                   </button>
-                )
+                );
               })}
             </div>
+
+            <p className="mt-3 font-mono text-[10px] leading-relaxed tracking-[0.1em] text-zinc-500">
+              {!form.date
+                ? '↑ Najpierw wybierz datę — dopiero wtedy poznamy wolne godziny.'
+                : 'Przekreślone godziny na dziś już minęły (potrzebujesz min. godziny na dojazd).'}
+            </p>
           </div>
         </div>
-      </div>
+      </Sekcja>
 
-      {/* KROK 3: LICZNIK PASAŻERÓW */}
-      <div className="border border-white/15 bg-black/70 p-6 sm:p-8">
-        <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-400 block mb-4">
-          KROK 3 // LICZBA PASAŻERÓW
-        </span>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
+      {/* ── 03 · MIEJSCA ───────────────────────────────────────────────── */}
+      <Sekcja indeks="03" tytul="LICZBA MIEJSC">
+        <div className="space-y-5">
+          <label className={KL_ETYKIETA}>
+            <Users className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="min-w-0 truncate">Pasażerowie</span>
+          </label>
+
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => handleSeatsChange(-1)}
-              className="w-12 h-12 border border-white/20 hover:border-white/50 text-white font-mono text-lg flex items-center justify-center transition-colors cursor-pointer"
+              onClick={() => zmienMiejsca(-1)}
+              disabled={form.seats <= 1}
+              aria-label="Zmniejsz liczbę miejsc"
+              className={KL_LICZNIK}
             >
-              -
+              −
             </button>
-            <div className="w-16 h-12 flex items-center justify-center font-['Barlow_Condensed'] text-3xl font-bold text-white border border-transparent">
-              {formData.seatsCount}
-            </div>
+
+            <output
+              aria-live="polite"
+              className="flex h-12 min-w-[3.5rem] flex-shrink-0 items-center justify-center font-['Barlow_Condensed'] text-4xl font-bold leading-none tabular-nums text-white"
+            >
+              {form.seats}
+            </output>
+
             <button
               type="button"
-              onClick={() => handleSeatsChange(1)}
-              className="w-12 h-12 border border-white/20 hover:border-white/50 text-white font-mono text-lg flex items-center justify-center transition-colors cursor-pointer"
+              onClick={() => zmienMiejsca(1)}
+              disabled={form.seats >= limitMiejsc}
+              aria-label="Zwiększ liczbę miejsc"
+              className={KL_LICZNIK}
             >
               +
             </button>
+
+            <span className="min-w-0 flex-1 truncate text-right font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+              limit {osoby(limitMiejsc)}
+            </span>
           </div>
-          <p className="font-mono text-[10px] text-zinc-500 tracking-[0.1em]">
-            * Wymóg min. {cfg.bookingConfig.minPassengersForCruise} osób do startu rejsu (możliwość łączenia rezerwacji).
+
+          {/* Pasek obłożenia — wizualnie tłumaczy, czym jest próg startu. */}
+          <div className="flex h-1.5 w-full gap-[2px]" aria-hidden="true">
+            {Array.from({ length: limitMiejsc }, (_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'min-w-0 flex-1',
+                  i < form.seats
+                    ? 'bg-white'
+                    : i < rez.minPassengersForCruise
+                      ? 'bg-white/25'
+                      : 'bg-white/10',
+                )}
+              />
+            ))}
+          </div>
+
+          {/* Polska odmiana przez liczbę ma TRZY formy, nie dwie — helper
+              `osoby`/`miejsca` z lib/format.ts pilnuje, żeby nie wyszło
+              „4 miejsc" ani „1 osób". */}
+          <p className="font-mono text-[10px] leading-relaxed tracking-[0.1em] text-zinc-500">
+            {form.seats >= rez.minPassengersForCruise
+              ? `Komplet — ${osoby(form.seats)} wystarczy, żeby rejs wypłynął bez łączenia z inną grupą.`
+              : `Rejs startuje od ${osoby(rez.minPassengersForCruise)}. Do kompletu: ${miejsca(rez.minPassengersForCruise - form.seats)}. Dobieramy je ze zgłoszeń na ten sam termin — dlatego rezerwację potwierdzamy telefonicznie.`}
           </p>
         </div>
-      </div>
+      </Sekcja>
 
-      {/* KROK 4: DANE I WYSYŁKA */}
-      <div className="border border-white/15 bg-black/70 p-6 sm:p-8">
-        <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-400 block mb-4">
-          KROK 4 // DANE KONTAKTOWE I FINALIZACJA
-        </span>
+      {/* ── 04 · KONTAKT ───────────────────────────────────────────────── */}
+      <Sekcja indeks="04" tytul="DANE KONTAKTOWE">
+        <div className="space-y-5">
+          <div>
+            <label htmlFor="rez-imie" className={KL_ETYKIETA}>
+              <User className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="min-w-0 truncate">Imię i nazwisko</span>
+            </label>
+            <input
+              id="rez-imie"
+              type="text"
+              autoComplete="name"
+              value={form.name}
+              aria-invalid={zleUzupelnione('name')}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder="np. Jan Kowalski"
+              className={cn(KL_POLE, zleUzupelnione('name') && 'border-white')}
+            />
+          </div>
 
-        {status === 'success' ? (
-          <div className="py-12 text-center space-y-3">
-            <CheckCircle2 className="w-12 h-12 text-white mx-auto animate-pulse flex-shrink-0" />
-            <h4 className="font-mono text-sm font-bold uppercase tracking-wider text-white">
-              Zgłoszenie przyjęte
-            </h4>
-            <p className="text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
-              Sternik weryfikuje dostępność miejsc i warunki pogodowe. Za chwilę skontaktujemy się z Tobą telefonicznie w celu potwierdzenia rejsu.
+          <div>
+            <label htmlFor="rez-telefon" className={KL_ETYKIETA}>
+              <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="min-w-0 truncate">Numer telefonu</span>
+            </label>
+            <input
+              id="rez-telefon"
+              type="tel"
+              /* `inputMode="tel"` otwiera na telefonie klawiaturę numeryczną,
+                 ale nie blokuje wklejenia numeru ze spacjami czy `+48`. */
+              inputMode="tel"
+              autoComplete="tel"
+              value={form.phone}
+              aria-invalid={zleUzupelnione('phone')}
+              onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+              placeholder="np. 509 562 635"
+              className={cn(KL_POLE, zleUzupelnione('phone') && 'border-white')}
+            />
+            <p className="mt-2 font-mono text-[10px] tracking-[0.1em] text-zinc-500">
+              Na ten numer oddzwaniamy z potwierdzeniem — to jedyny sposób,
+              w jaki domykamy rezerwację.
             </p>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 whitespace-nowrap">
-                <User className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
-                <span className="min-w-0">Imię i Nazwisko</span>
-              </label>
-              <input
-                required
-                type="text"
-                value={formData.clientName}
-                onChange={(e) => updateForm('clientName', e.target.value)}
-                className="w-full rounded-none appearance-none bg-transparent border border-white/20 px-4 py-3 text-white font-mono text-sm focus:border-white focus:ring-0 focus:outline-none transition-colors"
-                placeholder="np. Jan Kowalski"
-              />
-            </div>
+        </div>
+      </Sekcja>
 
-            <div className="space-y-1">
-              <label className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 flex items-center gap-2 whitespace-nowrap">
-                <Phone className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
-                <span className="min-w-0">Numer telefonu</span>
-              </label>
-              <input
-                required
-                type="tel"
-                value={formData.clientPhone}
-                onChange={(e) => updateForm('clientPhone', e.target.value)}
-                className="w-full rounded-none appearance-none bg-transparent border border-white/20 px-4 py-3 text-white font-mono text-sm focus:border-white focus:ring-0 focus:outline-none transition-colors"
-                placeholder="np. 509 562 635"
-              />
-            </div>
-
-            {status === 'error' && (
-              <div className="p-3 border border-white/20 bg-transparent text-white font-mono text-xs">
-                Wystąpił błąd sieci. Zadzwoń bezpośrednio: {cfg.contact.phone}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={status === 'loading'}
-              className="w-full mt-4 rounded-none border border-white bg-white text-black hover:bg-transparent hover:text-white transition-all px-4 sm:px-6 py-4 font-mono text-[10px] sm:text-xs tracking-[0.2em] uppercase font-bold flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer whitespace-nowrap flex-shrink-0"
-            >
-              {status === 'loading' ? (
-                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin flex-shrink-0" />
-              ) : (
-                <span className="min-w-0">WYŚLIJ ZAPYTANIE O REJS</span>
-              )}
-            </button>
-            <p className="font-mono text-[9px] text-center text-zinc-500 tracking-[0.1em] mt-3">
-              * Płatność gotówką, BLIK lub kartą na miejscu. Brak przedpłat.
-            </p>
-          </form>
-        )}
+      {/* ── PODSUMOWANIE ───────────────────────────────────────────────── */}
+      <div className="border-t border-white/10 pt-8">
+        {/* Każda komórka ma `min-w-0 truncate` — długa nazwa jednostki
+            nie rozepchnie siatki na mikroekranie. */}
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border border-white/10 bg-white/5 p-4">
+          <PolePodsumowania etykieta="Jednostka" wartosc={jednostka?.name ?? '—'} />
+          <PolePodsumowania
+            etykieta="Termin"
+            wartosc={form.date && form.timeSlot ? `${form.date} · ${form.timeSlot}` : '—'}
+          />
+          <PolePodsumowania etykieta="Miejsca" wartosc={`${form.seats}`} />
+          <PolePodsumowania etykieta="Płatność" wartosc="na przystani" />
+        </dl>
       </div>
+
+      {/* ── KOMUNIKATY ─────────────────────────────────────────────────── */}
+      {proba && bledy.length > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 border border-white/40 bg-white/5 p-4 font-mono text-xs text-white"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span className="min-w-0">{bledy[0]?.tekst}</span>
+        </div>
+      )}
+
+      {status === 'blad' && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 border border-white/40 bg-white/5 p-4 font-mono text-xs text-white"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span className="min-w-0">
+            Zgłoszenie nie wyszło — sprawdź połączenie i spróbuj ponownie.
+            Zawsze możesz zadzwonić: {cfg.contact.phone}.
+          </span>
+        </div>
+      )}
+
+      {/* ── WYSYŁKA ────────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <button type="submit" disabled={status === 'wysylka'} className={KL_PRZYCISK_GLOWNY}>
+          {status === 'wysylka' ? (
+            <>
+              <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin" />
+              <span>WYSYŁAM…</span>
+            </>
+          ) : (
+            <>
+              {/* Dwa warianty etykiety zamiast jednej łamiącej się w środku
+                  słowa: pełny tekst nie mieści się w 272 px panelu. */}
+              <span className="sm:hidden">WYŚLIJ ZGŁOSZENIE</span>
+              <span className="hidden sm:inline">WYŚLIJ ZAPYTANIE O REJS</span>
+            </>
+          )}
+        </button>
+
+        <p className="font-mono text-[10px] leading-relaxed tracking-[0.1em] text-zinc-500">
+          {rez.paymentNote}
+        </p>
+        <p className="text-[10px] leading-relaxed text-zinc-600">{rez.privacyNote}</p>
+      </div>
+    </form>
+  );
+}
+
+/* --------------------------------------------------------------------------
+ *  PODKOMPONENTY
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Sekcja formularza — linia, indeks porządkowy i tytuł.
+ *
+ * To NIE jest krok kreatora: numer jest wyłącznie typograficzny (tak samo jak
+ * `[ 01 ]` przy łodziach w zakładce FLOTA) i niczego nie bramkuje. Wszystkie
+ * sekcje są widoczne naraz i przewijają się jednym ruchem.
+ */
+function Sekcja({
+  indeks,
+  tytul,
+  children,
+}: {
+  indeks: string;
+  tytul: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-t border-white/10 pt-8 first:border-t-0 first:pt-0">
+      <div className="mb-6 flex items-baseline gap-3">
+        <span className="flex-shrink-0 whitespace-nowrap font-mono text-[10px] tracking-[0.3em] text-zinc-600">
+          [ {indeks} ]
+        </span>
+        <h4 className="min-w-0 flex-1 truncate whitespace-nowrap font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-white">
+          {tytul}
+        </h4>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Jedna pozycja podsumowania: etykieta nad wartością, obie ucinane. */
+function PolePodsumowania({ etykieta, wartosc }: { etykieta: string; wartosc: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">
+        {etykieta}
+      </dt>
+      <dd className="mt-1 truncate font-mono text-xs text-white" title={wartosc}>
+        {wartosc}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * Ekran potwierdzenia — zastępuje formularz w całości.
+ *
+ * Copy jest tu celowo ostrożne. Tryb `no-cors` nie pozwala potwierdzić, że
+ * wiersz naprawdę wylądował w arkuszu, więc obiecujemy dokładnie tyle, ile
+ * wiemy na pewno: zgłoszenie poszło, a wiążące potwierdzenie przyjdzie
+ * telefonicznie. Napisanie tu „Rezerwacja potwierdzona" byłoby kłamstwem,
+ * które wraca do klienta na przystani.
+ */
+function EkranPotwierdzenia({
+  jednostka,
+  termin,
+  miejsca: liczbaMiejsc,
+  telefon,
+  onNowa,
+}: {
+  jednostka: string;
+  termin: string;
+  miejsca: number;
+  telefon: string;
+  onNowa: () => void;
+}) {
+  return (
+    <div className="border border-white/15 bg-black/80 px-5 py-12 text-center sm:px-10 sm:py-16">
+      <div
+        className="mx-auto mb-8 flex h-14 w-14 flex-shrink-0 items-center justify-center border border-white/30"
+        aria-hidden="true"
+      >
+        <CheckCircle2 className="h-7 w-7 text-white" />
+      </div>
+
+      {/*
+        Nagłówek rozbity na dwa wiersze CELOWO. „ZGŁOSZENIE PRZYJĘTE" w jednej
+        linii z `whitespace-nowrap` ma przy 36 px ~274 px szerokości i wychodzi
+        poza 232 px dostępne na ekranie 320 px. Dwa osobne `<span>`, każdy
+        z własnym `whitespace-nowrap`, dają ten sam efekt typograficzny
+        i zerowe ryzyko poziomego scrolla.
+      */}
+      <h4 className="mt-4 font-['Barlow_Condensed'] text-4xl font-bold uppercase leading-[0.95] tracking-tight text-white sm:text-5xl">
+        <span className="block flex-shrink-0 whitespace-nowrap">ZGŁOSZENIE</span>
+        <span className="block flex-shrink-0 whitespace-nowrap">PRZYJĘTE</span>
+      </h4>
+
+      <p className="mx-auto mt-6 max-w-sm text-sm leading-relaxed text-zinc-400">
+        {cfg.bookingConfig.successNote}
+      </p>
+
+      <dl className="mx-auto mt-10 grid max-w-sm grid-cols-2 gap-x-4 gap-y-4 border-y border-white/10 py-6 text-left">
+        <PolePodsumowania etykieta="Jednostka" wartosc={jednostka} />
+        <PolePodsumowania etykieta="Termin" wartosc={termin} />
+        <PolePodsumowania etykieta="Miejsca" wartosc={`${liczbaMiejsc}`} />
+        <PolePodsumowania etykieta="Oddzwonimy na" wartosc={telefon} />
+      </dl>
+
+      <a href={cfg.contact.phoneHref} className={cn(KL_PRZYCISK_GLOWNY, 'mt-10')}>
+        <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+        <span>NIE CZEKAJ — ZADZWOŃ</span>
+      </a>
+
+      <button type="button" onClick={onNowa} className={cn(KL_PRZYCISK_POBOCZNY, 'mt-3')}>
+        <span>ZGŁOŚ KOLEJNY REJS</span>
+      </button>
     </div>
   );
 }

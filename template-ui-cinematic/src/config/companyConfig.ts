@@ -305,19 +305,76 @@ export interface SocialLinks {
   instagram?: string;
 }
 
+/* --------------------------------------------------------------------------
+ *  SILNIK REZERWACJI
+ *  Kontrakt danych dla 4-etapowego formularza (src/components/DossierPanel.tsx)
+ *  oraz dla warstwy automatyzacji (automatyzacje/README.md).
+ * ------------------------------------------------------------------------ */
+
+/** Jednostka pływająca dostępna do rezerwacji (krok 1 formularza). */
 export interface BookingUnit {
+  /**
+   * Identyfikator techniczny — klucz listy w React i wartość stanu formularza.
+   * NIE trafia do arkusza; do arkusza idzie `name` (patrz niżej, dlaczego).
+   */
   id: string;
+  /**
+   * Nazwa wysyłana do kolumny `Jednostka` w arkuszu.
+   * ⚠️ Musi zgadzać się CO DO ZNAKU z kolumną A zakładki `Ustawienia`.
+   * Po tym ciągu formuła SUMIFS dopasowuje rezerwacje do slotu w grafiku,
+   * a Apps Script odczytuje pojemność jednostki. Literówka = rejs, którego
+   * dashboard nie widzi.
+   */
   name: string;
+  /** Maksymalna liczba pasażerów TEJ jednostki — górny limit licznika w kroku 3. */
   capacity: number;
+  /** Jednowierszowy opis na kafelku wyboru, np. „100 km/h · Foki · 12 miejsc". */
   desc: string;
 }
 
+/** Komplet ustawień silnika rezerwacji. */
 export interface BookingConfig {
+  /**
+   * Adres, pod który leci zgłoszenie: wdrożony Apps Script (`.../exec`)
+   * albo produkcyjny webhook n8n. Porównanie obu ścieżek:
+   * `automatyzacje/README.md`, sekcja „Którą ścieżkę wybrać".
+   */
   webhookUrl: string;
+  /**
+   * Godziny wypłynięć w formacie `GG:MM`.
+   * ⚠️ Ta sama lista musi stać w zakładce `Ustawienia`, kolumna G — inaczej
+   * generator siatki dnia wyprodukuje wiersze dla godzin, których nie ma
+   * w formularzu (albo odwrotnie).
+   */
   timeSlots: string[];
+  /** Flota dostępna w formularzu. */
   units: BookingUnit[];
+  /**
+   * Minimalna liczba pasażerów, przy której rejs w ogóle wypływa.
+   * Wartość informacyjna dla klienta w kroku 3; tę samą liczbę trzyma
+   * zakres nazwany `PROG_STARTU` w arkuszu i to ona steruje statusem
+   * „🟡 SZUKAJ LUDZI" w grafiku załogi.
+   */
   minPassengersForCruise: number;
+  /** Twardy górny limit licznika miejsc, gdy jednostka nie poda własnego. */
   maxCapacity: number;
+  /** Liczba miejsc ustawiona przy pierwszym wejściu (najczęstszy scenariusz: para). */
+  defaultSeats: number;
+  /**
+   * Jak daleko w przód wolno rezerwować (atrybut `max` pola daty).
+   * Musi być ≤ `KONFIG.horyzontDni` w Apps Script, inaczej front przepuści
+   * termin, który backend odrzuci — a przy `mode: 'no-cors'` użytkownik
+   * NIE ZOBACZY tego błędu.
+   */
+  bookingHorizonDays: number;
+  /** Wartość kolumny `Zrodlo` w arkuszu — pozwala odróżnić kanały sprzedaży. */
+  source: string;
+  /** Klauzula informacyjna RODO pod przyciskiem wysyłki (krok 4). */
+  privacyNote: string;
+  /** Zdanie o płatności — tu pada „brak przedpłat", więc gasi typową obawę. */
+  paymentNote: string;
+  /** Treść ekranu potwierdzenia: co się teraz stanie i kiedy. */
+  successNote: string;
 }
 
 /** Główny kontrakt — spina wszystkie sekcje powyżej. */
@@ -597,14 +654,51 @@ export const companyConfig: CompanyConfig = {
   },
 
   bookingConfig: {
-    webhookUrl: "https://script.google.com/macros/s/AKfycbybu61ulS0HxViMrg5GXb7OYDy31K96u5WP5Mw4YxnQh2CPLnb_Y4GIxNWJIwwCf_yVPg/exec",
-    timeSlots: ["10:00", "11:30", "13:00", "14:30", "16:00", "17:30", "19:00"],
+    /*
+     * KOLEJNOŚĆ ŹRÓDEŁ: zmienna środowiskowa wygrywa z wartością wpisaną niżej.
+     * Po co, skoro adres i tak jest publiczny? Bo pozwala mieć INNY endpoint
+     * na podglądzie (preview) niż na produkcji i przełączyć Apps Script ↔ n8n
+     * z panelu Vercela, bez commita. Vite podstawia wartość w czasie builda,
+     * więc po zmianie zmiennej trzeba wywołać redeploy.
+     *
+     * Wartość zapasowa = aktualnie wdrożony Apps Script. Dzięki niej projekt
+     * działa od razu po `git clone`, bez konfigurowania środowiska.
+     */
+    webhookUrl:
+      import.meta.env.VITE_BOOKING_WEBHOOK_URL ||
+      'https://script.google.com/macros/s/AKfycbybu61ulS0HxViMrg5GXb7OYDy31K96u5WP5Mw4YxnQh2CPLnb_Y4GIxNWJIwwCf_yVPg/exec',
+
+    // ⚠️ Lustro kolumny G zakładki `Ustawienia` w arkuszu.
+    timeSlots: ['10:00', '11:30', '13:00', '14:30', '16:00', '17:30', '19:00'],
+
+    // ⚠️ Pole `name` to lustro kolumny A zakładki `Ustawienia`.
     units: [
-      { id: "rib", name: "SZYBKA MOTORÓWKA RIB", capacity: 12, desc: "100 km/h · Foki · Adrenalina · 12 miejsc" },
-      { id: "slow", name: "STATEK WOLNY", capacity: 12, desc: "Spokojny rejs widokowy · Komfort · 12 miejsc" }
+      {
+        id: 'rib',
+        name: 'SZYBKA MOTORÓWKA RIB',
+        capacity: 12,
+        desc: '100 km/h · Foki · Adrenalina · 12 miejsc',
+      },
+      {
+        id: 'slow',
+        name: 'STATEK WOLNY',
+        capacity: 12,
+        desc: 'Spokojny rejs widokowy · Komfort · 12 miejsc',
+      },
     ],
+
     minPassengersForCruise: 8,
-    maxCapacity: 12
+    maxCapacity: 12,
+    defaultSeats: 2,
+    bookingHorizonDays: 120, // = KONFIG.horyzontDni w automatyzacje/apps-script/Kod.gs
+    source: 'WWW',
+
+    privacyNote:
+      'Administratorem danych jest Morskie Safari. Imię i numer telefonu przetwarzamy wyłącznie w celu potwierdzenia rezerwacji rejsu (art. 6 ust. 1 lit. b RODO). Danych nie przekazujemy podmiotom trzecim w celach marketingowych.',
+    paymentNote:
+      'Płatność gotówką, BLIK-iem lub kartą na przystani, przed rejsem. Nie pobieramy przedpłat ani zadatku.',
+    successNote:
+      'Sternik weryfikuje dostępność miejsc i prognozę na akwenie. Oddzwaniamy w ciągu dnia roboczego, aby potwierdzić rejs. Rezerwacja jest wiążąca dopiero po tej rozmowie.',
   },
 };
 
