@@ -45,9 +45,10 @@ Komenda zawiera komplet potrzebnych flag:
 | ----------------- | ----------------------------------------------------------- | -------- |
 | `raw.mp4`       | Surowy materiał wejściowy dla `npm run optimize-video`        | nie      |
 | `bg.mp4`        | Wideo tła odtwarzane automatycznie w pętli                    | tak      |
-| `bg-poster.jpg` | Klatka zastępcza pokazywana zanim wideo się wczyta            | zalecany |
+| `poster.webp`   | Klatka zastępcza pokazywana zanim wideo się wczyta             | zalecany |
+| `bg-poster.jpg` | Źródło JPEG dla `poster.webp` (i materiał na `og:image`)      | nie      |
 
-Ścieżki do `bg.mp4` i `bg-poster.jpg` ustawia się w `src/config/companyConfig.ts`
+Ścieżki do `bg.mp4` i `poster.webp` ustawia się w `src/config/companyConfig.ts`
 (sekcja `media`) — komponent `App.tsx` nie zawiera żadnej ścieżki na sztywno.
 
 **Poster jest ważniejszy, niż się wydaje.** To on jest widoczny, gdy:
@@ -55,12 +56,34 @@ przeglądarka odmówi autoodtwarzania, użytkownik ma włączone „ogranicz ani
 (`prefers-reduced-motion`), albo łącze jest zbyt wolne. Powinien być realną,
 reprezentatywną klatką z materiału, nie czarnym prostokątem.
 
-## Dlaczego katalog jest pusty w repozytorium
+## Ten katalog a Git — stan faktyczny
 
-Pliki wideo (dziesiątki–setki MB) nie należą do repozytorium Git — każda ich wersja
-zostawałaby w historii na zawsze i po kilku podmianach klonowanie repo trwałoby wieczność.
-Dlatego `.gitignore` ignoruje zawartość tego katalogu, zachowując sam katalog
-(dzięki plikowi `.gitkeep`).
+Zamysł był taki, żeby pliki wideo (dziesiątki–setki MB) NIE trafiały do repozytorium:
+każda ich wersja zostawałaby w historii na zawsze i po kilku podmianach klonowanie repo
+trwałoby wieczność. Główny `.gitignore` ma nawet odpowiednią regułę:
+
+```gitignore
+public/videos/*
+!public/videos/.gitkeep
+!public/videos/README.md
+```
+
+**Ta reguła w tym repozytorium nie działa.** Wzorzec zawierający ukośnik jest
+w `.gitignore` *zakotwiczony* w katalogu samego pliku `.gitignore`, więc
+`public/videos/*` dopasowuje wyłącznie `<root>/public/videos/*` — a realna ścieżka
+to `template-ui-cinematic/public/videos/`. Skutek: `bg.mp4` (8 MB), `bg-poster.jpg`
+i `poster.webp` **są śledzone przez Gita** i jadą na Vercela razem z kodem.
+
+Na dziś to działa na naszą korzyść (Vercel buduje z repo, więc tło jest na produkcji),
+ale kolejna podmiana 8-megabajtowego wideo trwale powiększy historię. Docelowo:
+albo poprawić wzorzec na `**/public/videos/*` i przenieść materiał na CDN,
+albo świadomie zostawić jak jest i pilnować rozmiaru pliku.
+
+Sprawdzenie stanu:
+
+```bash
+git ls-files template-ui-cinematic/public/videos/
+```
 
 **Bez pliku wideo strona nadal działa poprawnie** — po 2 sekundach zadziała bezpiecznik
 z `App.tsx` (`UI_FALLBACK_TIMEOUT_MS`) i interfejs pokaże się na samym tle.
@@ -71,11 +94,25 @@ z `App.tsx` (`UI_FALLBACK_TIMEOUT_MS`) i interfejs pokaże się na samym tle.
 ffmpeg -i material-zrodlowy.mp4 -an -vf "scale=1920:-2" -c:v libx264 -crf 23 -preset slow -profile:v main -level 4.0 -pix_fmt yuv420p -movflags +faststart bg.mp4
 ```
 
-Poster wyciągnięty z gotowego wideo (druga sekunda materiału):
+Poster wyciągnięty z gotowego wideo (druga sekunda materiału), a potem
+przekodowany na WebP — ta sama klatka waży wtedy o ok. jedną trzecią mniej:
 
 ```bash
-ffmpeg -i bg.mp4 -ss 00:00:02 -frames:v 1 -q:v 3 bg-poster.jpg
+ffmpeg -y -i bg.mp4 -ss 00:00:02 -frames:v 1 -q:v 3 bg-poster.jpg
 ```
+```bash
+ffmpeg -y -i bg-poster.jpg -c:v libwebp -quality 82 -compression_level 6 -preset picture poster.webp
+```
+
+Zmierzone na tym projekcie: **116 750 B → 76 876 B (−34%)** przy tych samych
+wymiarach 1280×720. Poster ładuje się od pierwszej klatki renderowania, więc
+jego waga wchodzi wprost w LCP.
+
+⚠️ `<video poster>` przyjmuje **jeden** adres — nie ma tu odpowiednika
+`<picture>` z listą formatów. WebP obsługują wszystkie przeglądarki od 2020 r.
+(Safari 14+); na starszej przeglądarce poster się po prostu nie pokaże, a wideo
+i tak zadziała. Jeśli musisz obsłużyć takie urządzenia, wskaż w konfiguracji
+`bg-poster.jpg` zamiast `poster.webp`.
 
 ## Zalecane parametry
 

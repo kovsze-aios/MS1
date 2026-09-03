@@ -860,8 +860,19 @@ function RezerwacjaContent() {
               id="rez-data"
               type="date"
               value={form.date}
-              /* `min`/`max` wygaszają w natywnym kalendarzu terminy, których
-                 backend i tak by nie przyjął — użytkownik nie zdąży się pomylić. */
+              /*
+                BLOKADA DAT Z PRZESZŁOŚCI (i zbyt odległych).
+                `min`/`max` wygaszają w natywnym kalendarzu terminy, których
+                backend i tak by nie przyjął — użytkownik nie zdąży się pomylić.
+
+                ⚠️ NIE PODMIENIAJ `dataISO()` NA `new Date().toISOString().split('T')[0]`.
+                To najczęstszy skrót w tym miejscu i jest BŁĘDNY: `toISOString()`
+                zwraca czas UTC, więc dla użytkownika w Polsce między 00:00 a 02:00
+                (czas letni) poda datę WCZORAJSZĄ i pole wpuści termin z przeszłości.
+                `dataISO()` liczy w strefie lokalnej — szczegóły w jej JSDoc.
+                Walidacja `form.date < dataISO()` w `bledy` używa tej samej funkcji,
+                więc obie bramki mówią jednym głosem.
+              */
               min={dataISO()}
               max={dataISO(rez.bookingHorizonDays)}
               aria-invalid={zleUzupelnione('date')}
@@ -1073,11 +1084,24 @@ function RezerwacjaContent() {
 
       {/* ── WYSYŁKA ────────────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <button type="submit" disabled={status === 'wysylka'} className={KL_PRZYCISK_GLOWNY}>
+        {/*
+          PODWÓJNA BLOKADA WYSYŁKI. `disabled` gasi przycisk wizualnie i odcina
+          kliknięcia, ale samo nie wystarcza: klawisz Enter w polu tekstowym
+          nadal wywołuje `submit` formularza. Dlatego `handleSubmit` zaczyna od
+          `if (status === 'wysylka') return;`. Dopiero te dwie rzeczy razem
+          gwarantują, że jedno zgłoszenie nie trafi do arkusza dwa razy —
+          a przy `mode: 'no-cors'` nie mielibyśmy jak takiego duplikatu wykryć.
+        */}
+        <button
+          type="submit"
+          disabled={status === 'wysylka'}
+          aria-busy={status === 'wysylka'}
+          className={KL_PRZYCISK_GLOWNY}
+        >
           {status === 'wysylka' ? (
             <>
               <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin" />
-              <span>WYSYŁAM…</span>
+              <span>WYSYŁANIE...</span>
             </>
           ) : (
             <>

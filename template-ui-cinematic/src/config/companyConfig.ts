@@ -479,7 +479,15 @@ export const companyConfig: CompanyConfig = {
 
   media: {
     heroVideoUrl: '/videos/bg.mp4',
-    heroVideoPoster: '/videos/bg-poster.jpg',
+    /*
+     * Poster w WebP zamiast JPEG: ta sama klatka 1280×720 waży 77 kB zamiast
+     * 117 kB (−34%). To obraz ładowany od pierwszej klatki renderowania, więc
+     * jego waga wchodzi wprost w LCP — a jest widoczny dłużej, niż się wydaje:
+     * pokazuje się także wtedy, gdy przeglądarka odmówi autoodtwarzania albo
+     * użytkownik ma włączone „ogranicz animacje".
+     * Generowanie: instrukcja w public/videos/README.md.
+     */
+    heroVideoPoster: '/videos/poster.webp',
   },
 
   cruise: {
